@@ -241,14 +241,14 @@ export default function AnalysisPage() {
 
       {selectedMatch && videoId && (
         <div className="flex flex-col md:flex-row md:items-start md:gap-6">
-          <div className="flex flex-col gap-3 md:sticky md:top-20 md:w-[340px] md:shrink-0">
-            <div className="sticky top-16 z-10 bg-background pb-2 md:static md:pb-0">
-              <div className="aspect-video w-full max-w-[240px] md:max-w-none rounded-md overflow-hidden bg-black">
-                <div id={PLAYER_ELEMENT_ID} className="w-full h-full" />
-              </div>
-              {!playerReady && <p className="text-sm text-foreground/60 pt-2">Oynatıcı yükleniyor...</p>}
+          <div className="flex-1 min-w-0 md:sticky md:top-20">
+            <div className="aspect-video w-full rounded-md overflow-hidden bg-black">
+              <div id={PLAYER_ELEMENT_ID} className="w-full h-full" />
             </div>
+            {!playerReady && <p className="text-sm text-foreground/60 pt-2">Oynatıcı yükleniyor...</p>}
+          </div>
 
+          <div className="mt-6 md:mt-0 md:w-[320px] md:shrink-0 flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <h2 className={sectionTitle}>Aktif Oyuncu</h2>
               <div className="flex flex-wrap gap-2">
@@ -308,36 +308,36 @@ export default function AnalysisPage() {
                 ))}
               </div>
             </div>
-          </div>
 
-          <div className="mt-6 md:mt-0 flex-1 flex flex-col gap-2 min-w-0">
-            <h2 className={sectionTitle}>Olay Akışı</h2>
-            {events.length === 0 ? (
-              <p className="text-foreground/60 text-sm">Henüz olay kaydedilmedi.</p>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {events.map((ev) => (
-                  <li
-                    key={ev.id}
-                    className={`${card} flex items-center justify-between py-3 text-sm ${
-                      ev.id < 0 ? "opacity-50" : ""
-                    }`}
-                  >
-                    <button onClick={() => seekTo(ev.minute, ev.second)} className="text-left hover:underline">
-                      <span className="font-mono text-accent">
-                        {ev.minute}:{(ev.second ?? 0).toString().padStart(2, "0")}
-                      </span>{" "}
-                      — {playerLabel(ev.player_id)} —{" "}
-                      {EVENT_TYPES.find((et) => et.key === ev.event_type)?.label ?? ev.event_type}
-                      {ev.zone && ` — ${ZONES.find((z) => z.value === ev.zone)?.label}`}
-                    </button>
-                    <button onClick={() => handleDeleteEvent(ev.id)} className={dangerLink}>
-                      Sil
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <div className="flex flex-col gap-2">
+              <h2 className={sectionTitle}>Olay Akışı</h2>
+              {events.length === 0 ? (
+                <p className="text-foreground/60 text-sm">Henüz olay kaydedilmedi.</p>
+              ) : (
+                <ul className="flex flex-col gap-2 max-h-80 overflow-y-auto">
+                  {events.map((ev) => (
+                    <li
+                      key={ev.id}
+                      className={`${card} flex items-center justify-between py-3 text-sm ${
+                        ev.id < 0 ? "opacity-50" : ""
+                      }`}
+                    >
+                      <button onClick={() => seekTo(ev.minute, ev.second)} className="text-left hover:underline">
+                        <span className="font-mono text-accent">
+                          {ev.minute}:{(ev.second ?? 0).toString().padStart(2, "0")}
+                        </span>{" "}
+                        — {playerLabel(ev.player_id)} —{" "}
+                        {EVENT_TYPES.find((et) => et.key === ev.event_type)?.label ?? ev.event_type}
+                        {ev.zone && ` — ${ZONES.find((z) => z.value === ev.zone)?.label}`}
+                      </button>
+                      <button onClick={() => handleDeleteEvent(ev.id)} className={dangerLink}>
+                        Sil
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         </div>
       )}
