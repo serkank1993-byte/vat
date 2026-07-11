@@ -50,5 +50,6 @@ export type MatchEvent = {
   minute: number;
   second: number | null;
   description: string | null;
+  zone: number | null;
   created_at: string;
 };

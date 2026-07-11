@@ -4,6 +4,18 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Match, MatchEvent, Player, Team } from "@/lib/types";
 
+const ZONES: { value: number; label: string }[] = [
+  { value: 1, label: "Def Left" },
+  { value: 2, label: "Def Center" },
+  { value: 3, label: "Def Right" },
+  { value: 4, label: "Mid Left" },
+  { value: 5, label: "Mid Center" },
+  { value: 6, label: "Mid Right" },
+  { value: 7, label: "Att Left" },
+  { value: 8, label: "Att Center" },
+  { value: 9, label: "Att Right" },
+];
+
 const EVENT_TYPES: { key: string; label: string }[] = [
   { key: "goal", label: "Goal" },
   { key: "assist", label: "Assist" },
@@ -33,6 +45,7 @@ export default function LivePage() {
 
   const [matchId, setMatchId] = useState("");
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
+  const [selectedZone, setSelectedZone] = useState<number | null>(null);
   const [events, setEvents] = useState<MatchEvent[]>([]);
 
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -83,6 +96,7 @@ export default function LivePage() {
   function handleSelectMatch(id: string) {
     setMatchId(id);
     setSelectedPlayerId("");
+    setSelectedZone(null);
     setElapsedSeconds(0);
     setRunning(false);
     loadEvents(id);
@@ -112,6 +126,7 @@ export default function LivePage() {
         event_type: eventType,
         minute,
         second,
+        zone: selectedZone,
       })
       .select()
       .single();
@@ -196,6 +211,27 @@ export default function LivePage() {
           </div>
 
           <div className="flex flex-col gap-2">
+            <h2 className="text-sm font-medium text-black/70 dark:text-white/70">
+              Pitch zone {selectedZone && "— " + ZONES.find((z) => z.value === selectedZone)?.label}
+            </h2>
+            <div className="grid grid-cols-3 grid-rows-3 gap-1 w-56 aspect-[3/4] rounded-md overflow-hidden border border-black/10 dark:border-white/20">
+              {ZONES.map((z) => (
+                <button
+                  key={z.value}
+                  onClick={() => setSelectedZone(selectedZone === z.value ? null : z.value)}
+                  className={`flex items-center justify-center text-center text-[10px] leading-tight p-1 transition-colors ${
+                    selectedZone === z.value
+                      ? "bg-green-600 text-white"
+                      : "bg-green-700/10 dark:bg-green-400/10 hover:bg-green-700/20 dark:hover:bg-green-400/20"
+                  }`}
+                >
+                  {z.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
             <h2 className="text-sm font-medium text-black/70 dark:text-white/70">Log event</h2>
             <div className="flex flex-wrap gap-2">
               {EVENT_TYPES.map((et) => (
@@ -228,6 +264,7 @@ export default function LivePage() {
                       </span>{" "}
                       — {playerLabel(ev.player_id)} —{" "}
                       {EVENT_TYPES.find((et) => et.key === ev.event_type)?.label ?? ev.event_type}
+                      {ev.zone && ` — ${ZONES.find((z) => z.value === ev.zone)?.label}`}
                     </span>
                     <button
                       onClick={() => handleDeleteEvent(ev.id)}
