@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import type { Match, MatchEvent, Player, Team } from "@/lib/types";
 import { EVENT_TYPES, ZONES } from "@/lib/match-tracking";
 import { extractYouTubeId, loadYouTubeIframeApi, type YTPlayer } from "@/lib/youtube";
+import { card, chip, dangerLink, input, pageTitle, primaryButton, secondaryButton, sectionTitle } from "@/lib/ui";
 
 const PLAYER_ELEMENT_ID = "vat-youtube-player";
 
@@ -76,7 +77,7 @@ export default function AnalysisPage() {
     e.preventDefault();
     if (!matchId || !videoUrlInput.trim()) return;
     if (!extractYouTubeId(videoUrlInput.trim())) {
-      setError("That doesn't look like a valid YouTube link.");
+      setError("Bu geçerli bir YouTube linkine benzemiyor.");
       return;
     }
     const { error } = await supabase
@@ -203,19 +204,19 @@ export default function AnalysisPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Video Analysis</h1>
+      <h1 className={pageTitle}>Video Analiz</h1>
       {error && <p className="text-red-600 text-sm">{error}</p>}
-      {loading && <p>Loading...</p>}
+      {loading && <p className="text-foreground/60">Yükleniyor...</p>}
 
       <select
         value={matchId}
         onChange={(e) => handleSelectMatch(e.target.value)}
-        className="self-start rounded-md border border-black/10 dark:border-white/20 px-3 py-2 bg-transparent"
+        className={`self-start ${input}`}
       >
-        <option value="">Select a match</option>
+        <option value="">Maç seç</option>
         {matches.map((m) => (
           <option key={m.id} value={m.id}>
-            {teamName(m.team_id)} vs {m.opponent_name} ({new Date(m.match_date).toLocaleDateString()})
+            {teamName(m.team_id)} - {m.opponent_name} ({new Date(m.match_date).toLocaleDateString("tr-TR")})
           </option>
         ))}
       </select>
@@ -225,22 +226,17 @@ export default function AnalysisPage() {
           <input
             value={videoUrlInput}
             onChange={(e) => setVideoUrlInput(e.target.value)}
-            placeholder="Paste the YouTube match link"
-            className="flex-1 rounded-md border border-black/10 dark:border-white/20 px-3 py-2 bg-transparent"
+            placeholder="Maçın YouTube linkini yapıştır"
+            className={`flex-1 ${input}`}
           />
-          <button
-            type="submit"
-            className="rounded-md bg-foreground text-background px-4 py-2 font-medium"
-          >
-            Save video
+          <button type="submit" className={primaryButton}>
+            Videoyu kaydet
           </button>
         </form>
       )}
 
       {selectedMatch && selectedMatch.video_url && !videoId && (
-        <p className="text-red-600 text-sm">
-          Saved video link doesn&apos;t look like a valid YouTube URL.
-        </p>
+        <p className="text-red-600 text-sm">Kayıtlı video linki geçerli bir YouTube URL&apos;sine benzemiyor.</p>
       )}
 
       {selectedMatch && videoId && (
@@ -248,45 +244,39 @@ export default function AnalysisPage() {
           <div className="aspect-video w-full max-w-2xl rounded-md overflow-hidden bg-black">
             <div id={PLAYER_ELEMENT_ID} className="w-full h-full" />
           </div>
-          {!playerReady && <p className="text-sm text-black/60 dark:text-white/60">Loading player...</p>}
+          {!playerReady && <p className="text-sm text-foreground/60">Oynatıcı yükleniyor...</p>}
 
           <div className="flex flex-col gap-2">
-            <h2 className="text-sm font-medium text-black/70 dark:text-white/70">Active player</h2>
+            <h2 className={sectionTitle}>Aktif Oyuncu</h2>
             <div className="flex flex-wrap gap-2">
               {playersForSelectedMatch.map((p) => (
                 <button
                   key={p.id}
                   onClick={() => setSelectedPlayerId(String(p.id))}
-                  className={`rounded-md border px-4 py-3 text-base font-medium ${
-                    selectedPlayerId === String(p.id)
-                      ? "bg-foreground text-background border-transparent"
-                      : "border-black/10 dark:border-white/20"
-                  }`}
+                  className={chip(selectedPlayerId === String(p.id))}
                 >
                   #{p.jersey_number} {p.name}
                 </button>
               ))}
               {playersForSelectedMatch.length === 0 && (
-                <p className="text-black/60 dark:text-white/60 text-sm">
-                  No players found for this match&apos;s team.
-                </p>
+                <p className="text-foreground/60 text-sm">Bu maçın takımı için oyuncu bulunamadı.</p>
               )}
             </div>
           </div>
 
           <div className="flex flex-col gap-2">
-            <h2 className="text-sm font-medium text-black/70 dark:text-white/70">
-              Pitch zone {selectedZone && "— " + ZONES.find((z) => z.value === selectedZone)?.label}
+            <h2 className={sectionTitle}>
+              Saha Bölgesi {selectedZone && "— " + ZONES.find((z) => z.value === selectedZone)?.label}
             </h2>
-            <div className="grid grid-cols-3 grid-rows-3 gap-1 w-56 aspect-[3/4] rounded-md overflow-hidden border border-black/10 dark:border-white/20">
+            <div className="grid grid-cols-3 grid-rows-3 gap-1 w-56 aspect-[3/4] rounded-md overflow-hidden border border-border">
               {ZONES.map((z) => (
                 <button
                   key={z.value}
                   onClick={() => setSelectedZone(selectedZone === z.value ? null : z.value)}
                   className={`flex items-center justify-center text-center text-[10px] leading-tight p-1 transition-colors ${
                     selectedZone === z.value
-                      ? "bg-green-600 text-white"
-                      : "bg-green-700/10 dark:bg-green-400/10 hover:bg-green-700/20 dark:hover:bg-green-400/20"
+                      ? "bg-accent text-accent-foreground"
+                      : "bg-accent/10 hover:bg-accent/20"
                   }`}
                 >
                   {z.label}
@@ -297,13 +287,9 @@ export default function AnalysisPage() {
 
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-medium text-black/70 dark:text-white/70">Log event</h2>
-              <button
-                onClick={handleUndoLast}
-                disabled={events.length === 0}
-                className="text-sm text-red-600 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Undo last
+              <h2 className={sectionTitle}>Olay Kaydet</h2>
+              <button onClick={handleUndoLast} disabled={events.length === 0} className={dangerLink}>
+                Son işlemi geri al
               </button>
             </div>
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -312,7 +298,7 @@ export default function AnalysisPage() {
                   key={et.key}
                   onClick={() => logEvent(et.key)}
                   disabled={!selectedPlayerId || !playerReady}
-                  className="rounded-lg border border-black/10 dark:border-white/20 px-3 py-4 text-base font-medium active:scale-95 transition-transform disabled:opacity-40 disabled:cursor-not-allowed hover:bg-black/5 dark:hover:bg-white/10"
+                  className={`${secondaryButton} py-4`}
                 >
                   {et.label}
                 </button>
@@ -321,34 +307,28 @@ export default function AnalysisPage() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <h2 className="text-sm font-medium text-black/70 dark:text-white/70">Event feed</h2>
+            <h2 className={sectionTitle}>Olay Akışı</h2>
             {events.length === 0 ? (
-              <p className="text-black/60 dark:text-white/60 text-sm">No events logged yet.</p>
+              <p className="text-foreground/60 text-sm">Henüz olay kaydedilmedi.</p>
             ) : (
               <ul className="flex flex-col gap-2">
                 {events.map((ev) => (
                   <li
                     key={ev.id}
-                    className={`flex items-center justify-between rounded-md border border-black/10 dark:border-white/10 px-4 py-2 text-sm ${
+                    className={`${card} flex items-center justify-between py-3 text-sm ${
                       ev.id < 0 ? "opacity-50" : ""
                     }`}
                   >
-                    <button
-                      onClick={() => seekTo(ev.minute, ev.second)}
-                      className="text-left hover:underline"
-                    >
-                      <span className="font-mono">
+                    <button onClick={() => seekTo(ev.minute, ev.second)} className="text-left hover:underline">
+                      <span className="font-mono text-accent">
                         {ev.minute}:{(ev.second ?? 0).toString().padStart(2, "0")}
                       </span>{" "}
                       — {playerLabel(ev.player_id)} —{" "}
                       {EVENT_TYPES.find((et) => et.key === ev.event_type)?.label ?? ev.event_type}
                       {ev.zone && ` — ${ZONES.find((z) => z.value === ev.zone)?.label}`}
                     </button>
-                    <button
-                      onClick={() => handleDeleteEvent(ev.id)}
-                      className="text-sm text-red-600 hover:underline"
-                    >
-                      Delete
+                    <button onClick={() => handleDeleteEvent(ev.id)} className={dangerLink}>
+                      Sil
                     </button>
                   </li>
                 ))}

@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Match, Team } from "@/lib/types";
+import { card, dangerLink, input, pageTitle, primaryButton } from "@/lib/ui";
+
+const STATUS_LABELS: Record<string, string> = {
+  scheduled: "Planlandı",
+  completed: "Tamamlandı",
+  finished: "Tamamlandı",
+};
 
 export default function MatchesPage() {
   const [matches, setMatches] = useState<Match[]>([]);
@@ -62,15 +69,11 @@ export default function MatchesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Matches</h1>
+      <h1 className={pageTitle}>Maçlar</h1>
 
       <form onSubmit={handleAdd} className="flex flex-wrap gap-2">
-        <select
-          value={teamId}
-          onChange={(e) => setTeamId(e.target.value)}
-          className="rounded-md border border-black/10 dark:border-white/20 px-3 py-2 bg-transparent"
-        >
-          <option value="">Team</option>
+        <select value={teamId} onChange={(e) => setTeamId(e.target.value)} className={input}>
+          <option value="">Takım</option>
           {teams.map((team) => (
             <option key={team.id} value={team.id}>
               {team.name}
@@ -80,54 +83,47 @@ export default function MatchesPage() {
         <input
           value={opponentName}
           onChange={(e) => setOpponentName(e.target.value)}
-          placeholder="Opponent"
-          className="flex-1 min-w-[140px] rounded-md border border-black/10 dark:border-white/20 px-3 py-2 bg-transparent"
+          placeholder="Rakip"
+          className={`flex-1 min-w-[140px] ${input}`}
         />
         <input
           value={matchDate}
           onChange={(e) => setMatchDate(e.target.value)}
           type="datetime-local"
-          className="rounded-md border border-black/10 dark:border-white/20 px-3 py-2 bg-transparent"
+          className={input}
         />
         <input
           value={location}
           onChange={(e) => setLocation(e.target.value)}
-          placeholder="Location"
-          className="w-32 rounded-md border border-black/10 dark:border-white/20 px-3 py-2 bg-transparent"
+          placeholder="Konum"
+          className={`w-32 ${input}`}
         />
-        <button
-          type="submit"
-          className="rounded-md bg-foreground text-background px-4 py-2 font-medium"
-        >
-          Add
+        <button type="submit" className={primaryButton}>
+          Ekle
         </button>
       </form>
 
       {error && <p className="text-red-600 text-sm">{error}</p>}
       {loading ? (
-        <p>Loading...</p>
+        <p className="text-foreground/60">Yükleniyor...</p>
       ) : matches.length === 0 ? (
-        <p className="text-black/60 dark:text-white/60">No matches yet.</p>
+        <p className="text-foreground/60">Henüz maç yok.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {matches.map((match) => (
-            <li
-              key={match.id}
-              className="flex items-center justify-between rounded-md border border-black/10 dark:border-white/10 px-4 py-2"
-            >
+            <li key={match.id} className={`${card} flex items-center justify-between py-3`}>
               <span>
-                {teamName(match.team_id)} vs {match.opponent_name}{" "}
-                <span className="text-black/50 dark:text-white/50">
-                  {new Date(match.match_date).toLocaleString()}
+                <span className="font-medium">
+                  {teamName(match.team_id)} - {match.opponent_name}
+                </span>{" "}
+                <span className="text-foreground/50">
+                  {new Date(match.match_date).toLocaleString("tr-TR")}
                   {match.location ? ` · ${match.location}` : ""} ·{" "}
-                  {match.status ?? "scheduled"}
+                  {STATUS_LABELS[match.status ?? "scheduled"] ?? match.status}
                 </span>
               </span>
-              <button
-                onClick={() => handleDelete(match.id)}
-                className="text-sm text-red-600 hover:underline"
-              >
-                Delete
+              <button onClick={() => handleDelete(match.id)} className={dangerLink}>
+                Sil
               </button>
             </li>
           ))}

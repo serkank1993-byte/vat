@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Team } from "@/lib/types";
+import { card, dangerLink, input, pageTitle, primaryButton } from "@/lib/ui";
 
 export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
@@ -45,41 +46,32 @@ export default function TeamsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Teams</h1>
+      <h1 className={pageTitle}>Takımlar</h1>
 
       <form onSubmit={handleAdd} className="flex gap-2">
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Team name"
-          className="flex-1 rounded-md border border-black/10 dark:border-white/20 px-3 py-2 bg-transparent"
+          placeholder="Takım adı"
+          className={`flex-1 ${input}`}
         />
-        <button
-          type="submit"
-          className="rounded-md bg-foreground text-background px-4 py-2 font-medium"
-        >
-          Add
+        <button type="submit" className={primaryButton}>
+          Ekle
         </button>
       </form>
 
       {error && <p className="text-red-600 text-sm">{error}</p>}
       {loading ? (
-        <p>Loading...</p>
+        <p className="text-foreground/60">Yükleniyor...</p>
       ) : teams.length === 0 ? (
-        <p className="text-black/60 dark:text-white/60">No teams yet.</p>
+        <p className="text-foreground/60">Henüz takım yok.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {teams.map((team) => (
-            <li
-              key={team.id}
-              className="flex items-center justify-between rounded-md border border-black/10 dark:border-white/10 px-4 py-2"
-            >
-              <span>{team.name}</span>
-              <button
-                onClick={() => handleDelete(team.id)}
-                className="text-sm text-red-600 hover:underline"
-              >
-                Delete
+            <li key={team.id} className={`${card} flex items-center justify-between py-3`}>
+              <span className="font-medium">{team.name}</span>
+              <button onClick={() => handleDelete(team.id)} className={dangerLink}>
+                Sil
               </button>
             </li>
           ))}

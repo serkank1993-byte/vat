@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Match, MatchStat, Player, Team } from "@/lib/types";
+import { card, input, pageTitle, primaryButton, sectionTitle } from "@/lib/ui";
+
+const CARD_LABELS: Record<string, string> = { yellow: "Sarı", red: "Kırmızı" };
 
 export default function DashboardPage() {
   const [teams, setTeams] = useState<Team[]>([]);
@@ -180,33 +183,33 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
+      <h1 className={pageTitle}>İstatistikler</h1>
       {error && <p className="text-red-600 text-sm">{error}</p>}
-      {loading && <p>Loading...</p>}
+      {loading && <p className="text-foreground/60">Yükleniyor...</p>}
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Team Record</h2>
+        <h2 className={sectionTitle}>Takım Karnesi</h2>
         {teamRecords.length === 0 ? (
-          <p className="text-black/60 dark:text-white/60">No teams yet.</p>
+          <p className="text-foreground/60 text-sm">Henüz takım yok.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className={`${card} overflow-x-auto`}>
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="text-left border-b border-black/10 dark:border-white/10">
-                  <th className="py-2 pr-4">Team</th>
-                  <th className="py-2 pr-4">Played</th>
-                  <th className="py-2 pr-4">W</th>
-                  <th className="py-2 pr-4">D</th>
-                  <th className="py-2 pr-4">L</th>
-                  <th className="py-2 pr-4">GF</th>
-                  <th className="py-2 pr-4">GA</th>
-                  <th className="py-2 pr-4">GD</th>
+                <tr className="text-left border-b border-border">
+                  <th className="py-2 pr-4">Takım</th>
+                  <th className="py-2 pr-4">O</th>
+                  <th className="py-2 pr-4">G</th>
+                  <th className="py-2 pr-4">B</th>
+                  <th className="py-2 pr-4">M</th>
+                  <th className="py-2 pr-4">AG</th>
+                  <th className="py-2 pr-4">YG</th>
+                  <th className="py-2 pr-4">Av</th>
                 </tr>
               </thead>
               <tbody>
                 {teamRecords.map((r) => (
-                  <tr key={r.team.id} className="border-b border-black/5 dark:border-white/5">
-                    <td className="py-2 pr-4">{r.team.name}</td>
+                  <tr key={r.team.id} className="border-b border-border last:border-0">
+                    <td className="py-2 pr-4 font-medium">{r.team.name}</td>
                     <td className="py-2 pr-4">{r.played}</td>
                     <td className="py-2 pr-4">{r.wins}</td>
                     <td className="py-2 pr-4">{r.draws}</td>
@@ -222,56 +225,31 @@ export default function DashboardPage() {
         )}
       </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-medium">Top Scorers</h2>
-          {topScorers.length === 0 ? (
-            <p className="text-black/60 dark:text-white/60 text-sm">No goals recorded yet.</p>
-          ) : (
-            <ol className="flex flex-col gap-1 text-sm list-decimal list-inside">
-              {topScorers.map(([id, goals]) => (
-                <li key={id}>
-                  {playerLabel(id)} — {goals}
-                </li>
-              ))}
-            </ol>
-          )}
-        </section>
-
-        <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-medium">Top Assists</h2>
-          {topAssists.length === 0 ? (
-            <p className="text-black/60 dark:text-white/60 text-sm">No assists recorded yet.</p>
-          ) : (
-            <ol className="flex flex-col gap-1 text-sm list-decimal list-inside">
-              {topAssists.map(([id, assists]) => (
-                <li key={id}>
-                  {playerLabel(id)} — {assists}
-                </li>
-              ))}
-            </ol>
-          )}
-        </section>
-
-        <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-medium">Pass Accuracy</h2>
-          {passAccuracy.length === 0 ? (
-            <p className="text-black/60 dark:text-white/60 text-sm">No passes recorded yet.</p>
-          ) : (
-            <ol className="flex flex-col gap-1 text-sm list-decimal list-inside">
-              {passAccuracy.map((p) => (
-                <li key={p.playerId}>
-                  {playerLabel(p.playerId)} — {p.accuracy.toFixed(0)}% ({p.passes} passes)
-                </li>
-              ))}
-            </ol>
-          )}
-        </section>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Leaderboard
+          title="Gol Krallığı"
+          empty="Henüz gol kaydedilmedi."
+          rows={topScorers.map(([id, value]) => ({ label: playerLabel(id), value: String(value) }))}
+        />
+        <Leaderboard
+          title="Asist Krallığı"
+          empty="Henüz asist kaydedilmedi."
+          rows={topAssists.map(([id, value]) => ({ label: playerLabel(id), value: String(value) }))}
+        />
+        <Leaderboard
+          title="Pas İsabeti"
+          empty="Henüz pas kaydedilmedi."
+          rows={passAccuracy.map((p) => ({
+            label: playerLabel(p.playerId),
+            value: `%${p.accuracy.toFixed(0)}`,
+            hint: `${p.passes} pas`,
+          }))}
+        />
       </div>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Add Match Stat</h2>
-        <form onSubmit={handleAddStat} className="flex flex-col gap-2">
+        <h2 className={sectionTitle}>Maç İstatistiği Ekle</h2>
+        <form onSubmit={handleAddStat} className={`${card} flex flex-col gap-3`}>
           <div className="flex flex-wrap gap-2">
             <select
               value={matchId}
@@ -279,21 +257,17 @@ export default function DashboardPage() {
                 setMatchId(e.target.value);
                 setPlayerId("");
               }}
-              className="rounded-md border border-black/10 dark:border-white/20 px-3 py-2 bg-transparent"
+              className={input}
             >
-              <option value="">Match</option>
+              <option value="">Maç</option>
               {matches.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {teamName(m.team_id)} vs {m.opponent_name} ({new Date(m.match_date).toLocaleDateString()})
+                  {teamName(m.team_id)} - {m.opponent_name} ({new Date(m.match_date).toLocaleDateString("tr-TR")})
                 </option>
               ))}
             </select>
-            <select
-              value={playerId}
-              onChange={(e) => setPlayerId(e.target.value)}
-              className="rounded-md border border-black/10 dark:border-white/20 px-3 py-2 bg-transparent"
-            >
-              <option value="">Player</option>
+            <select value={playerId} onChange={(e) => setPlayerId(e.target.value)} className={input}>
+              <option value="">Oyuncu</option>
               {playersForSelectedMatch.map((p) => (
                 <option key={p.id} value={p.id}>
                   #{p.jersey_number} {p.name}
@@ -302,59 +276,49 @@ export default function DashboardPage() {
             </select>
           </div>
           <div className="flex flex-wrap gap-2">
-            <LabeledInput label="Passes" value={passes} onChange={setPasses} />
-            <LabeledInput label="Successful passes" value={successfulPasses} onChange={setSuccessfulPasses} />
-            <LabeledInput label="Shots" value={shots} onChange={setShots} />
-            <LabeledInput label="Shots on target" value={shotsOnTarget} onChange={setShotsOnTarget} />
-            <LabeledInput label="Dribbles" value={dribbles} onChange={setDribbles} />
-            <LabeledInput label="Tackles" value={tackles} onChange={setTackles} />
-            <LabeledInput label="Fouls" value={fouls} onChange={setFouls} />
-            <LabeledInput label="Assists" value={assists} onChange={setAssists} />
-            <LabeledInput label="Goals" value={goals} onChange={setGoals} />
+            <LabeledInput label="Pas" value={passes} onChange={setPasses} />
+            <LabeledInput label="İsabetli pas" value={successfulPasses} onChange={setSuccessfulPasses} />
+            <LabeledInput label="Şut" value={shots} onChange={setShots} />
+            <LabeledInput label="İsabetli şut" value={shotsOnTarget} onChange={setShotsOnTarget} />
+            <LabeledInput label="Çalım" value={dribbles} onChange={setDribbles} />
+            <LabeledInput label="Müdahale" value={tackles} onChange={setTackles} />
+            <LabeledInput label="Faul" value={fouls} onChange={setFouls} />
+            <LabeledInput label="Asist" value={assists} onChange={setAssists} />
+            <LabeledInput label="Gol" value={goals} onChange={setGoals} />
             <label className="flex flex-col text-xs gap-1">
-              Cards
-              <select
-                value={cards}
-                onChange={(e) => setCards(e.target.value)}
-                className="rounded-md border border-black/10 dark:border-white/20 px-3 py-2 bg-transparent"
-              >
-                <option value="">None</option>
-                <option value="yellow">Yellow</option>
-                <option value="red">Red</option>
+              Kart
+              <select value={cards} onChange={(e) => setCards(e.target.value)} className={input}>
+                <option value="">Yok</option>
+                <option value="yellow">Sarı</option>
+                <option value="red">Kırmızı</option>
               </select>
             </label>
           </div>
-          <button
-            type="submit"
-            className="self-start rounded-md bg-foreground text-background px-4 py-2 font-medium"
-          >
-            Add
+          <button type="submit" className={`self-start ${primaryButton}`}>
+            Ekle
           </button>
         </form>
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Match Stat Entries</h2>
+        <h2 className={sectionTitle}>Maç İstatistiği Kayıtları</h2>
         {stats.length === 0 ? (
-          <p className="text-black/60 dark:text-white/60 text-sm">No match stats yet.</p>
+          <p className="text-foreground/60 text-sm">Henüz maç istatistiği yok.</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {stats.map((s) => (
-              <li
-                key={s.id}
-                className="flex items-center justify-between rounded-md border border-black/10 dark:border-white/10 px-4 py-2 text-sm"
-              >
+              <li key={s.id} className={`${card} flex items-center justify-between py-3 text-sm`}>
                 <span>
-                  {playerLabel(s.player_id)} — G {s.goals ?? 0} · A {s.assists ?? 0} · Shots{" "}
-                  {s.shots_on_target ?? 0}/{s.shots ?? 0} · Passes {s.successful_passes ?? 0}/
+                  {playerLabel(s.player_id)} — G {s.goals ?? 0} · A {s.assists ?? 0} · Şut{" "}
+                  {s.shots_on_target ?? 0}/{s.shots ?? 0} · Pas {s.successful_passes ?? 0}/
                   {s.passes ?? 0}
-                  {s.cards ? ` · ${s.cards} card` : ""}
+                  {s.cards ? ` · ${CARD_LABELS[s.cards] ?? s.cards} kart` : ""}
                 </span>
                 <button
                   onClick={() => handleDeleteStat(s.id)}
                   className="text-sm text-red-600 hover:underline"
                 >
-                  Delete
+                  Sil
                 </button>
               </li>
             ))}
@@ -362,6 +326,38 @@ export default function DashboardPage() {
         )}
       </section>
     </div>
+  );
+}
+
+function Leaderboard({
+  title,
+  rows,
+  empty,
+}: {
+  title: string;
+  rows: { label: string; value: string; hint?: string }[];
+  empty: string;
+}) {
+  return (
+    <section className={`${card} flex flex-col gap-3`}>
+      <h2 className={sectionTitle}>{title}</h2>
+      {rows.length === 0 ? (
+        <p className="text-foreground/60 text-sm">{empty}</p>
+      ) : (
+        <ol className="flex flex-col gap-2">
+          {rows.map((row, i) => (
+            <li key={row.label + i} className="flex items-center gap-3 text-sm">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent text-xs font-semibold">
+                {i + 1}
+              </span>
+              <span className="flex-1">{row.label}</span>
+              <span className="font-semibold">{row.value}</span>
+              {row.hint && <span className="text-foreground/50 text-xs">{row.hint}</span>}
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
   );
 }
 
@@ -381,7 +377,7 @@ function LabeledInput({
         type="number"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded-md border border-black/10 dark:border-white/20 px-3 py-2 bg-transparent"
+        className={input}
       />
     </label>
   );

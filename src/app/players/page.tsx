@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Player, Team } from "@/lib/types";
+import { card, dangerLink, input, pageTitle, primaryButton } from "@/lib/ui";
 
 export default function PlayersPage() {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -62,71 +63,60 @@ export default function PlayersPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Players</h1>
+      <h1 className={pageTitle}>Oyuncular</h1>
 
       <form onSubmit={handleAdd} className="flex flex-wrap gap-2">
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Player name"
-          className="flex-1 min-w-[160px] rounded-md border border-black/10 dark:border-white/20 px-3 py-2 bg-transparent"
+          placeholder="Oyuncu adı"
+          className={`flex-1 min-w-[160px] ${input}`}
         />
         <input
           value={jerseyNumber}
           onChange={(e) => setJerseyNumber(e.target.value)}
           placeholder="#"
           type="number"
-          className="w-20 rounded-md border border-black/10 dark:border-white/20 px-3 py-2 bg-transparent"
+          className={`w-20 ${input}`}
         />
         <input
           value={position}
           onChange={(e) => setPosition(e.target.value)}
-          placeholder="Position"
-          className="w-32 rounded-md border border-black/10 dark:border-white/20 px-3 py-2 bg-transparent"
+          placeholder="Mevki"
+          className={`w-32 ${input}`}
         />
-        <select
-          value={teamId}
-          onChange={(e) => setTeamId(e.target.value)}
-          className="rounded-md border border-black/10 dark:border-white/20 px-3 py-2 bg-transparent"
-        >
-          <option value="">No team</option>
+        <select value={teamId} onChange={(e) => setTeamId(e.target.value)} className={input}>
+          <option value="">Takımsız</option>
           {teams.map((team) => (
             <option key={team.id} value={team.id}>
               {team.name}
             </option>
           ))}
         </select>
-        <button
-          type="submit"
-          className="rounded-md bg-foreground text-background px-4 py-2 font-medium"
-        >
-          Add
+        <button type="submit" className={primaryButton}>
+          Ekle
         </button>
       </form>
 
       {error && <p className="text-red-600 text-sm">{error}</p>}
       {loading ? (
-        <p>Loading...</p>
+        <p className="text-foreground/60">Yükleniyor...</p>
       ) : players.length === 0 ? (
-        <p className="text-black/60 dark:text-white/60">No players yet.</p>
+        <p className="text-foreground/60">Henüz oyuncu yok.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {players.map((player) => (
-            <li
-              key={player.id}
-              className="flex items-center justify-between rounded-md border border-black/10 dark:border-white/10 px-4 py-2"
-            >
+            <li key={player.id} className={`${card} flex items-center justify-between py-3`}>
               <span>
-                #{player.jersey_number} {player.name}{" "}
-                <span className="text-black/50 dark:text-white/50">
+                <span className="font-medium">
+                  #{player.jersey_number} {player.name}
+                </span>{" "}
+                <span className="text-foreground/50">
                   {player.position ?? ""} · {teamName(player.team_id)}
                 </span>
               </span>
-              <button
-                onClick={() => handleDelete(player.id)}
-                className="text-sm text-red-600 hover:underline"
-              >
-                Delete
+              <button onClick={() => handleDelete(player.id)} className={dangerLink}>
+                Sil
               </button>
             </li>
           ))}
