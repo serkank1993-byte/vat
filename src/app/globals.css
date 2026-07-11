@@ -31,6 +31,24 @@
   }
 }
 
+:root[data-theme="light"] {
+  --background: #f7faf8;
+  --foreground: #14261d;
+  --surface: #ffffff;
+  --border: rgba(20, 38, 29, 0.1);
+  --accent: #059669;
+  --accent-foreground: #ffffff;
+}
+
+:root[data-theme="dark"] {
+  --background: #0b1210;
+  --foreground: #e7f2ec;
+  --surface: #121a17;
+  --border: rgba(231, 242, 236, 0.12);
+  --accent: #10b981;
+  --accent-foreground: #04120c;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

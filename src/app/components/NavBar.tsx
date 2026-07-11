@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/useSession";
+import ThemeToggle from "./ThemeToggle";
 
 const LINKS = [
   { href: "/teams", label: "Takımlar" },
@@ -45,6 +46,7 @@ export default function NavBar() {
           );
         })}
         <div className="ml-auto flex items-center gap-1 shrink-0">
+          <ThemeToggle />
           {session ? (
             <>
               <Link
