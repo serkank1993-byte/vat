@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/useSession";
-import type { MatchAttendance, MatchStat, Player } from "@/lib/types";
+import type { MatchAttendance, MatchEvent, Player } from "@/lib/types";
 import { card, dangerLink, input, pageTitle, primaryButton, secondaryButton, sectionTitle } from "@/lib/ui";
 
 const PENDING_TOKEN_KEY = "vat_pending_invite_token";
@@ -13,7 +13,7 @@ export default function AccountPage() {
   const { session, loading: sessionLoading } = useSession();
   const [player, setPlayer] = useState<Player | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [stats, setStats] = useState<MatchStat[]>([]);
+  const [events, setEvents] = useState<MatchEvent[]>([]);
   const [attendance, setAttendance] = useState<MatchAttendance[]>([]);
   const [teamMatchCount, setTeamMatchCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -44,13 +44,13 @@ export default function AccountPage() {
       setName(data.name);
       setJerseyNumber(String(data.jersey_number));
       setPosition(data.position ?? "");
-      const [statsRes, attendanceRes, matchesRes] = await Promise.all([
-        supabase.from("match_stats").select("*").eq("player_id", data.id).order("created_at", { ascending: false }),
+      const [eventsRes, attendanceRes, matchesRes] = await Promise.all([
+        supabase.from("events").select("*").eq("player_id", data.id),
         supabase.from("match_attendance").select("*").eq("player_id", data.id),
         supabase.from("matches").select("id", { count: "exact", head: true }).eq("team_id", data.team_id),
       ]);
-      if (statsRes.error) setError(statsRes.error.message);
-      else setStats(statsRes.data ?? []);
+      if (eventsRes.error) setError(eventsRes.error.message);
+      else setEvents(eventsRes.data ?? []);
       if (attendanceRes.error) setError(attendanceRes.error.message);
       else setAttendance(attendanceRes.data ?? []);
       setTeamMatchCount(matchesRes.count ?? 0);
@@ -88,19 +88,21 @@ export default function AccountPage() {
     }
   }
 
-  const totals = stats.reduce(
-    (acc, s) => ({
-      goals: acc.goals + (s.goals ?? 0),
-      assists: acc.assists + (s.assists ?? 0),
-      passes: acc.passes + (s.passes ?? 0),
-      successfulPasses: acc.successfulPasses + (s.successful_passes ?? 0),
-      shots: acc.shots + (s.shots ?? 0),
-      shotsOnTarget: acc.shotsOnTarget + (s.shots_on_target ?? 0),
-      tackles: acc.tackles + (s.tackles ?? 0),
-      fouls: acc.fouls + (s.fouls ?? 0),
-    }),
-    { goals: 0, assists: 0, passes: 0, successfulPasses: 0, shots: 0, shotsOnTarget: 0, tackles: 0, fouls: 0 },
-  );
+  function countBy(eventType: string) {
+    return events.filter((e) => e.event_type === eventType).length;
+  }
+
+  const totals = {
+    goals: countBy("goal"),
+    assists: countBy("assist"),
+    passes: countBy("pass") + countBy("successful_pass"),
+    successfulPasses: countBy("successful_pass"),
+    shots: countBy("shot") + countBy("shot_on_target"),
+    shotsOnTarget: countBy("shot_on_target"),
+    tackles: countBy("tackle"),
+    fouls: countBy("foul"),
+  };
+  const matchesPlayed = new Set(events.map((e) => e.match_id)).size;
 
   const attendingCount = attendance.filter((a) => a.status === "geliyor").length;
   const attendanceRate = teamMatchCount > 0 ? Math.round((attendingCount / teamMatchCount) * 100) : null;
@@ -190,7 +192,7 @@ export default function AccountPage() {
           <Stat label="Pas (İsabetli)" value={`${totals.successfulPasses}/${totals.passes}`} />
           <Stat label="Müdahale" value={totals.tackles} />
           <Stat label="Faul" value={totals.fouls} />
-          <Stat label="Maç Kaydı" value={stats.length} />
+          <Stat label="Maç Kaydı" value={matchesPlayed} />
           <Stat label="Katılım Oranı" value={attendanceRate !== null ? `%${attendanceRate}` : "—"} />
         </div>
         <div className="flex gap-2">

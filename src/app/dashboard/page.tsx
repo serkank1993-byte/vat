@@ -2,46 +2,31 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import type { Match, MatchStat, Player, Team } from "@/lib/types";
-import { card, input, pageTitle, primaryButton, sectionTitle } from "@/lib/ui";
-
-const CARD_LABELS: Record<string, string> = { yellow: "Sarı", red: "Kırmızı" };
+import type { Match, MatchEvent, Player, Team } from "@/lib/types";
+import { card, pageTitle, sectionTitle } from "@/lib/ui";
 
 export default function DashboardPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
-  const [stats, setStats] = useState<MatchStat[]>([]);
+  const [events, setEvents] = useState<MatchEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [matchId, setMatchId] = useState("");
-  const [playerId, setPlayerId] = useState("");
-  const [passes, setPasses] = useState("0");
-  const [successfulPasses, setSuccessfulPasses] = useState("0");
-  const [shots, setShots] = useState("0");
-  const [shotsOnTarget, setShotsOnTarget] = useState("0");
-  const [dribbles, setDribbles] = useState("0");
-  const [tackles, setTackles] = useState("0");
-  const [fouls, setFouls] = useState("0");
-  const [assists, setAssists] = useState("0");
-  const [goals, setGoals] = useState("0");
-  const [cards, setCards] = useState("");
-
   async function loadData() {
     setLoading(true);
-    const [teamsRes, playersRes, matchesRes, statsRes] = await Promise.all([
+    const [teamsRes, playersRes, matchesRes, eventsRes] = await Promise.all([
       supabase.from("teams").select("*"),
       supabase.from("players").select("*"),
       supabase.from("matches").select("*").order("match_date", { ascending: false }),
-      supabase.from("match_stats").select("*").order("created_at", { ascending: false }),
+      supabase.from("events").select("*"),
     ]);
     if (teamsRes.error) setError(teamsRes.error.message);
     else setTeams(teamsRes.data ?? []);
     if (playersRes.data) setPlayers(playersRes.data);
     if (matchesRes.data) setMatches(matchesRes.data);
-    if (statsRes.error) setError(statsRes.error.message);
-    else setStats(statsRes.data ?? []);
+    if (eventsRes.error) setError(eventsRes.error.message);
+    else setEvents(eventsRes.data ?? []);
     setLoading(false);
   }
 
@@ -50,60 +35,10 @@ export default function DashboardPage() {
     loadData();
   }, []);
 
-  const playersForSelectedMatch = useMemo(() => {
-    const match = matches.find((m) => m.id === Number(matchId));
-    if (!match) return players;
-    return players.filter((p) => p.team_id === match.team_id);
-  }, [matchId, matches, players]);
-
-  function teamName(id: number | null) {
-    return teams.find((t) => t.id === id)?.name ?? "—";
-  }
-
   function playerLabel(id: number | null) {
     const player = players.find((p) => p.id === id);
     if (!player) return "—";
     return `#${player.jersey_number} ${player.name}`;
-  }
-
-  async function handleAddStat(e: React.FormEvent) {
-    e.preventDefault();
-    if (!matchId || !playerId) return;
-    const { error } = await supabase.from("match_stats").insert({
-      match_id: Number(matchId),
-      player_id: Number(playerId),
-      passes: Number(passes),
-      successful_passes: Number(successfulPasses),
-      shots: Number(shots),
-      shots_on_target: Number(shotsOnTarget),
-      dribbles: Number(dribbles),
-      tackles: Number(tackles),
-      fouls: Number(fouls),
-      assists: Number(assists),
-      goals: Number(goals),
-      cards: cards || null,
-    });
-    if (error) setError(error.message);
-    else {
-      setPlayerId("");
-      setPasses("0");
-      setSuccessfulPasses("0");
-      setShots("0");
-      setShotsOnTarget("0");
-      setDribbles("0");
-      setTackles("0");
-      setFouls("0");
-      setAssists("0");
-      setGoals("0");
-      setCards("");
-      loadData();
-    }
-  }
-
-  async function handleDeleteStat(id: number) {
-    const { error } = await supabase.from("match_stats").delete().eq("id", id);
-    if (error) setError(error.message);
-    else loadData();
   }
 
   const teamRecords = useMemo(() => {
@@ -137,55 +72,67 @@ export default function DashboardPage() {
     });
   }, [teams, matches]);
 
-  const topScorers = useMemo(() => {
+  function countBy(eventType: string) {
     const totals = new Map<number, number>();
-    for (const s of stats) {
-      if (s.player_id == null) continue;
-      totals.set(s.player_id, (totals.get(s.player_id) ?? 0) + (s.goals ?? 0));
+    for (const e of events) {
+      if (e.player_id == null || e.event_type !== eventType) continue;
+      totals.set(e.player_id, (totals.get(e.player_id) ?? 0) + 1);
     }
-    return [...totals.entries()]
-      .filter(([, goals]) => goals > 0)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
-  }, [stats]);
+    return totals;
+  }
+
+  const topScorers = useMemo(() => {
+    const totals = countBy("goal");
+    return [...totals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events]);
 
   const topAssists = useMemo(() => {
-    const totals = new Map<number, number>();
-    for (const s of stats) {
-      if (s.player_id == null) continue;
-      totals.set(s.player_id, (totals.get(s.player_id) ?? 0) + (s.assists ?? 0));
-    }
-    return [...totals.entries()]
-      .filter(([, assists]) => assists > 0)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
-  }, [stats]);
+    const totals = countBy("assist");
+    return [...totals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events]);
 
   const passAccuracy = useMemo(() => {
-    const totals = new Map<number, { passes: number; successful: number }>();
-    for (const s of stats) {
-      if (s.player_id == null) continue;
-      const entry = totals.get(s.player_id) ?? { passes: 0, successful: 0 };
-      entry.passes += s.passes ?? 0;
-      entry.successful += s.successful_passes ?? 0;
-      totals.set(s.player_id, entry);
-    }
-    return [...totals.entries()]
-      .filter(([, v]) => v.passes > 0)
-      .map(([playerId, v]) => ({
-        playerId,
-        accuracy: (v.successful / v.passes) * 100,
-        passes: v.passes,
-      }))
+    const passes = countBy("pass");
+    const successful = countBy("successful_pass");
+    const playerIds = new Set([...passes.keys(), ...successful.keys()]);
+    return [...playerIds]
+      .map((id) => {
+        const attempted = (passes.get(id) ?? 0) + (successful.get(id) ?? 0);
+        const made = successful.get(id) ?? 0;
+        return { playerId: id, attempted, accuracy: attempted > 0 ? (made / attempted) * 100 : 0 };
+      })
+      .filter((p) => p.attempted > 0)
       .sort((a, b) => b.accuracy - a.accuracy)
       .slice(0, 5);
-  }, [stats]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events]);
+
+  const shotAccuracy = useMemo(() => {
+    const shots = countBy("shot");
+    const onTarget = countBy("shot_on_target");
+    const playerIds = new Set([...shots.keys(), ...onTarget.keys()]);
+    return [...playerIds]
+      .map((id) => {
+        const attempted = (shots.get(id) ?? 0) + (onTarget.get(id) ?? 0);
+        const made = onTarget.get(id) ?? 0;
+        return { playerId: id, attempted, accuracy: attempted > 0 ? (made / attempted) * 100 : 0 };
+      })
+      .filter((p) => p.attempted > 0)
+      .sort((a, b) => b.accuracy - a.accuracy)
+      .slice(0, 5);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events]);
 
   return (
     <div className="flex flex-col gap-8">
       <h1 className={pageTitle}>İstatistikler</h1>
       {error && <p className="text-red-600 text-sm">{error}</p>}
       {loading && <p className="text-foreground/60">Yükleniyor...</p>}
+      <p className="text-sm text-foreground/60">
+        Bu sayfa, Canlı Takip ve Video Analiz sayfalarında kaydedilen olaylardan otomatik hesaplanır.
+      </p>
 
       <section className="flex flex-col gap-3">
         <h2 className={sectionTitle}>Takım Karnesi</h2>
@@ -225,7 +172,7 @@ export default function DashboardPage() {
         )}
       </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Leaderboard
           title="Gol Krallığı"
           empty="Henüz gol kaydedilmedi."
@@ -242,89 +189,19 @@ export default function DashboardPage() {
           rows={passAccuracy.map((p) => ({
             label: playerLabel(p.playerId),
             value: `%${p.accuracy.toFixed(0)}`,
-            hint: `${p.passes} pas`,
+            hint: `${p.attempted} pas`,
+          }))}
+        />
+        <Leaderboard
+          title="Şut İsabeti"
+          empty="Henüz şut kaydedilmedi."
+          rows={shotAccuracy.map((p) => ({
+            label: playerLabel(p.playerId),
+            value: `%${p.accuracy.toFixed(0)}`,
+            hint: `${p.attempted} şut`,
           }))}
         />
       </div>
-
-      <section className="flex flex-col gap-3">
-        <h2 className={sectionTitle}>Maç İstatistiği Ekle</h2>
-        <form onSubmit={handleAddStat} className={`${card} flex flex-col gap-3`}>
-          <div className="flex flex-wrap gap-2">
-            <select
-              value={matchId}
-              onChange={(e) => {
-                setMatchId(e.target.value);
-                setPlayerId("");
-              }}
-              className={input}
-            >
-              <option value="">Maç</option>
-              {matches.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {teamName(m.team_id)} - {m.opponent_name} ({new Date(m.match_date).toLocaleDateString("tr-TR")})
-                </option>
-              ))}
-            </select>
-            <select value={playerId} onChange={(e) => setPlayerId(e.target.value)} className={input}>
-              <option value="">Oyuncu</option>
-              {playersForSelectedMatch.map((p) => (
-                <option key={p.id} value={p.id}>
-                  #{p.jersey_number} {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <LabeledInput label="Pas" value={passes} onChange={setPasses} />
-            <LabeledInput label="İsabetli pas" value={successfulPasses} onChange={setSuccessfulPasses} />
-            <LabeledInput label="Şut" value={shots} onChange={setShots} />
-            <LabeledInput label="İsabetli şut" value={shotsOnTarget} onChange={setShotsOnTarget} />
-            <LabeledInput label="Çalım" value={dribbles} onChange={setDribbles} />
-            <LabeledInput label="Müdahale" value={tackles} onChange={setTackles} />
-            <LabeledInput label="Faul" value={fouls} onChange={setFouls} />
-            <LabeledInput label="Asist" value={assists} onChange={setAssists} />
-            <LabeledInput label="Gol" value={goals} onChange={setGoals} />
-            <label className="flex flex-col text-xs gap-1">
-              Kart
-              <select value={cards} onChange={(e) => setCards(e.target.value)} className={input}>
-                <option value="">Yok</option>
-                <option value="yellow">Sarı</option>
-                <option value="red">Kırmızı</option>
-              </select>
-            </label>
-          </div>
-          <button type="submit" className={`self-start ${primaryButton}`}>
-            Ekle
-          </button>
-        </form>
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className={sectionTitle}>Maç İstatistiği Kayıtları</h2>
-        {stats.length === 0 ? (
-          <p className="text-foreground/60 text-sm">Henüz maç istatistiği yok.</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {stats.map((s) => (
-              <li key={s.id} className={`${card} flex items-center justify-between py-3 text-sm`}>
-                <span>
-                  {playerLabel(s.player_id)} — G {s.goals ?? 0} · A {s.assists ?? 0} · Şut{" "}
-                  {s.shots_on_target ?? 0}/{s.shots ?? 0} · Pas {s.successful_passes ?? 0}/
-                  {s.passes ?? 0}
-                  {s.cards ? ` · ${CARD_LABELS[s.cards] ?? s.cards} kart` : ""}
-                </span>
-                <button
-                  onClick={() => handleDeleteStat(s.id)}
-                  className="text-sm text-red-600 hover:underline"
-                >
-                  Sil
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
     </div>
   );
 }
@@ -358,27 +235,5 @@ function Leaderboard({
         </ol>
       )}
     </section>
-  );
-}
-
-function LabeledInput({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="flex flex-col text-xs gap-1 w-28">
-      {label}
-      <input
-        type="number"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={input}
-      />
-    </label>
   );
 }
