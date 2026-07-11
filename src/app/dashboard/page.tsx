@@ -125,6 +125,46 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events]);
 
+  const playerStatsTable = useMemo(() => {
+    const goals = countBy("goal");
+    const assists = countBy("assist");
+    const shots = countBy("shot");
+    const shotsOnTarget = countBy("shot_on_target");
+    const passes = countBy("pass");
+    const successfulPasses = countBy("successful_pass");
+    const dribbles = countBy("dribble");
+    const tackles = countBy("tackle");
+    const fouls = countBy("foul");
+    const yellowCards = countBy("yellow_card");
+    const redCards = countBy("red_card");
+    const matchesByPlayer = new Map<number, Set<number>>();
+    for (const e of events) {
+      if (e.player_id == null || e.match_id == null) continue;
+      const set = matchesByPlayer.get(e.player_id) ?? new Set<number>();
+      set.add(e.match_id);
+      matchesByPlayer.set(e.player_id, set);
+    }
+
+    return players
+      .map((p) => ({
+        player: p,
+        matches: matchesByPlayer.get(p.id)?.size ?? 0,
+        goals: goals.get(p.id) ?? 0,
+        assists: assists.get(p.id) ?? 0,
+        shots: (shots.get(p.id) ?? 0) + (shotsOnTarget.get(p.id) ?? 0),
+        shotsOnTarget: shotsOnTarget.get(p.id) ?? 0,
+        passes: (passes.get(p.id) ?? 0) + (successfulPasses.get(p.id) ?? 0),
+        successfulPasses: successfulPasses.get(p.id) ?? 0,
+        dribbles: dribbles.get(p.id) ?? 0,
+        tackles: tackles.get(p.id) ?? 0,
+        fouls: fouls.get(p.id) ?? 0,
+        yellowCards: yellowCards.get(p.id) ?? 0,
+        redCards: redCards.get(p.id) ?? 0,
+      }))
+      .sort((a, b) => b.goals - a.goals || b.assists - a.assists);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events, players]);
+
   return (
     <div className="flex flex-col gap-8">
       <h1 className={pageTitle}>İstatistikler</h1>
@@ -202,6 +242,56 @@ export default function DashboardPage() {
           }))}
         />
       </div>
+
+      <section className="flex flex-col gap-3">
+        <h2 className={sectionTitle}>Oyuncu İstatistikleri</h2>
+        {playerStatsTable.length === 0 ? (
+          <p className="text-foreground/60 text-sm">Henüz oyuncu yok.</p>
+        ) : (
+          <div className={`${card} overflow-x-auto`}>
+            <table className="w-full text-sm border-collapse whitespace-nowrap">
+              <thead>
+                <tr className="text-left border-b border-border">
+                  <th className="py-2 pr-4">Oyuncu</th>
+                  <th className="py-2 pr-4">Maç</th>
+                  <th className="py-2 pr-4">Gol</th>
+                  <th className="py-2 pr-4">Asist</th>
+                  <th className="py-2 pr-4">Şut (İY)</th>
+                  <th className="py-2 pr-4">Pas (İY)</th>
+                  <th className="py-2 pr-4">Çalım</th>
+                  <th className="py-2 pr-4">Müdahale</th>
+                  <th className="py-2 pr-4">Faul</th>
+                  <th className="py-2 pr-4">Sarı</th>
+                  <th className="py-2 pr-4">Kırmızı</th>
+                </tr>
+              </thead>
+              <tbody>
+                {playerStatsTable.map((row) => (
+                  <tr key={row.player.id} className="border-b border-border last:border-0">
+                    <td className="py-2 pr-4 font-medium">
+                      #{row.player.jersey_number} {row.player.name}
+                    </td>
+                    <td className="py-2 pr-4">{row.matches}</td>
+                    <td className="py-2 pr-4">{row.goals}</td>
+                    <td className="py-2 pr-4">{row.assists}</td>
+                    <td className="py-2 pr-4">
+                      {row.shotsOnTarget}/{row.shots}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {row.successfulPasses}/{row.passes}
+                    </td>
+                    <td className="py-2 pr-4">{row.dribbles}</td>
+                    <td className="py-2 pr-4">{row.tackles}</td>
+                    <td className="py-2 pr-4">{row.fouls}</td>
+                    <td className="py-2 pr-4">{row.yellowCards}</td>
+                    <td className="py-2 pr-4">{row.redCards}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
