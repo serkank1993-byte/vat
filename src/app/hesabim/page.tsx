@@ -12,6 +12,7 @@ const PENDING_TOKEN_KEY = "vat_pending_invite_token";
 export default function AccountPage() {
   const { session, loading: sessionLoading } = useSession();
   const [player, setPlayer] = useState<Player | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [stats, setStats] = useState<MatchStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +31,9 @@ export default function AccountPage() {
       await supabase.rpc("claim_player_invite", { p_token: pendingToken });
       localStorage.removeItem(PENDING_TOKEN_KEY);
     }
+
+    const { data: adminData } = await supabase.rpc("is_admin");
+    setIsAdmin(Boolean(adminData));
 
     const { data, error } = await supabase.from("players").select("*").eq("user_id", userId).maybeSingle();
     if (error) setError(error.message);
@@ -115,9 +119,22 @@ export default function AccountPage() {
       <div className="flex flex-col gap-4">
         <h1 className={pageTitle}>Hesabım</h1>
         {error && <p className="text-red-600 text-sm">{error}</p>}
-        <p className="text-foreground/70">
-          Hesabın henüz bir oyuncu kaydına bağlı değil. Kaptanından bir davet linki iste.
-        </p>
+        {isAdmin ? (
+          <p className="text-foreground/70">
+            Yönetici olarak giriş yaptın. Bu sayfa oyuncular içindir —{" "}
+            <Link href="/teams" className="text-accent hover:underline">
+              yönetim sayfalarına dön
+            </Link>
+            .
+          </p>
+        ) : (
+          <p className="text-foreground/70">
+            Hesabın henüz bir oyuncu kaydına bağlı değil. Kaptanından bir davet linki iste.
+          </p>
+        )}
+        <button onClick={() => supabase.auth.signOut()} className={`self-start ${dangerLink}`}>
+          Çıkış Yap
+        </button>
       </div>
     );
   }

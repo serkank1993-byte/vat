@@ -3,17 +3,18 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import type { Player } from "@/lib/types";
 import { card, input, pageTitle, primaryButton } from "@/lib/ui";
 
 const PENDING_TOKEN_KEY = "vat_pending_invite_token";
+
+type InvitedPlayer = { id: number; name: string; jersey_number: number };
 
 function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
 
-  const [player, setPlayer] = useState<Player | null>(null);
+  const [player, setPlayer] = useState<InvitedPlayer | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -31,14 +32,12 @@ function SignupForm() {
       return;
     }
     supabase
-      .from("players")
-      .select("*")
-      .eq("invite_token", token)
+      .rpc("get_player_by_invite_token", { p_token: token })
       .maybeSingle()
       .then(({ data, error }) => {
         if (error) setLookupError(error.message);
         else if (!data) setLookupError("Bu davet linki geçersiz veya zaten kullanılmış.");
-        else setPlayer(data);
+        else setPlayer(data as InvitedPlayer);
         setLoading(false);
       });
   }, [token]);

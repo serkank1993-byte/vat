@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { card, input, pageTitle, primaryButton } from "@/lib/ui";
 
+const PENDING_BOOTSTRAP_KEY = "vat_pending_admin_bootstrap";
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -17,9 +19,20 @@ export default function LoginPage() {
     setSubmitting(true);
     setError(null);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setError(error.message);
+      setSubmitting(false);
+      return;
+    }
+
+    if (localStorage.getItem(PENDING_BOOTSTRAP_KEY)) {
+      await supabase.rpc("bootstrap_first_admin");
+      localStorage.removeItem(PENDING_BOOTSTRAP_KEY);
+    }
+
+    const { data: isAdmin } = await supabase.rpc("is_admin");
     setSubmitting(false);
-    if (error) setError(error.message);
-    else router.push("/hesabim");
+    router.push(isAdmin ? "/teams" : "/hesabim");
   }
 
   return (
