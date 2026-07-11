@@ -1,6 +1,26 @@
 export type Team = {
   id: number;
   name: string;
+  founded_date: string | null;
+  primary_color: string | null;
+  secondary_color: string | null;
+  jersey_image_url: string | null;
+  created_at: string;
+};
+
+export type TeamRecord = {
+  id: number;
+  team_id: number;
+  title: string;
+  detail: string | null;
+  created_at: string;
+};
+
+export type TeamAchievement = {
+  id: number;
+  team_id: number;
+  title: string;
+  year: number | null;
   created_at: string;
 };
 
