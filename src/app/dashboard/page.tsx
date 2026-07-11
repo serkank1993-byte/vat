@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Match, MatchEvent, Player, Team } from "@/lib/types";
-import { card, pageTitle, sectionTitle } from "@/lib/ui";
+import { card, input, pageTitle, sectionTitle } from "@/lib/ui";
 
 export default function DashboardPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [events, setEvents] = useState<MatchEvent[]>([]);
+  const [matchId, setMatchId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,9 +42,23 @@ export default function DashboardPage() {
     return `#${player.jersey_number} ${player.name}`;
   }
 
+  function teamName(id: number | null) {
+    return teams.find((t) => t.id === id)?.name ?? "—";
+  }
+
+  const filteredEvents = useMemo(() => {
+    if (!matchId) return events;
+    return events.filter((e) => e.match_id === Number(matchId));
+  }, [events, matchId]);
+
+  const filteredMatches = useMemo(() => {
+    if (!matchId) return matches;
+    return matches.filter((m) => m.id === Number(matchId));
+  }, [matches, matchId]);
+
   const teamRecords = useMemo(() => {
     return teams.map((team) => {
-      const teamMatches = matches.filter((m) => m.team_id === team.id);
+      const teamMatches = filteredMatches.filter((m) => m.team_id === team.id);
       let wins = 0;
       let draws = 0;
       let losses = 0;
@@ -70,11 +85,11 @@ export default function DashboardPage() {
         goalsAgainst,
       };
     });
-  }, [teams, matches]);
+  }, [teams, filteredMatches]);
 
   function countBy(eventType: string) {
     const totals = new Map<number, number>();
-    for (const e of events) {
+    for (const e of filteredEvents) {
       if (e.player_id == null || e.event_type !== eventType) continue;
       totals.set(e.player_id, (totals.get(e.player_id) ?? 0) + 1);
     }
@@ -85,13 +100,13 @@ export default function DashboardPage() {
     const totals = countBy("goal");
     return [...totals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [events]);
+  }, [filteredEvents]);
 
   const topAssists = useMemo(() => {
     const totals = countBy("assist");
     return [...totals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [events]);
+  }, [filteredEvents]);
 
   const passAccuracy = useMemo(() => {
     const passes = countBy("pass");
@@ -107,7 +122,7 @@ export default function DashboardPage() {
       .sort((a, b) => b.accuracy - a.accuracy)
       .slice(0, 5);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [events]);
+  }, [filteredEvents]);
 
   const shotAccuracy = useMemo(() => {
     const shots = countBy("shot");
@@ -123,7 +138,7 @@ export default function DashboardPage() {
       .sort((a, b) => b.accuracy - a.accuracy)
       .slice(0, 5);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [events]);
+  }, [filteredEvents]);
 
   const playerStatsTable = useMemo(() => {
     const goals = countBy("goal");
@@ -138,7 +153,7 @@ export default function DashboardPage() {
     const yellowCards = countBy("yellow_card");
     const redCards = countBy("red_card");
     const matchesByPlayer = new Map<number, Set<number>>();
-    for (const e of events) {
+    for (const e of filteredEvents) {
       if (e.player_id == null || e.match_id == null) continue;
       const set = matchesByPlayer.get(e.player_id) ?? new Set<number>();
       set.add(e.match_id);
@@ -163,7 +178,7 @@ export default function DashboardPage() {
       }))
       .sort((a, b) => b.goals - a.goals || b.assists - a.assists);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [events, players]);
+  }, [filteredEvents, players]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -173,6 +188,15 @@ export default function DashboardPage() {
       <p className="text-sm text-foreground/60">
         Bu sayfa, Canlı Takip ve Video Analiz sayfalarında kaydedilen olaylardan otomatik hesaplanır.
       </p>
+
+      <select value={matchId} onChange={(e) => setMatchId(e.target.value)} className={`self-start ${input}`}>
+        <option value="">Tüm maçlar (kümüle)</option>
+        {matches.map((m) => (
+          <option key={m.id} value={m.id}>
+            {teamName(m.team_id)} - {m.opponent_name} ({new Date(m.match_date).toLocaleDateString("tr-TR")})
+          </option>
+        ))}
+      </select>
 
       <section className="flex flex-col gap-3">
         <h2 className={sectionTitle}>Takım Karnesi</h2>
