@@ -240,73 +240,77 @@ export default function AnalysisPage() {
       )}
 
       {selectedMatch && videoId && (
-        <>
-          <div className="aspect-video w-full max-w-2xl rounded-md overflow-hidden bg-black">
-            <div id={PLAYER_ELEMENT_ID} className="w-full h-full" />
-          </div>
-          {!playerReady && <p className="text-sm text-foreground/60">Oynatıcı yükleniyor...</p>}
+        <div className="flex flex-col lg:flex-row lg:items-start lg:gap-6">
+          <div className="flex flex-col gap-3 lg:sticky lg:top-20 lg:w-[380px] lg:shrink-0">
+            <div className="sticky top-16 z-10 bg-background pb-2 lg:static lg:pb-0">
+              <div className="aspect-video w-full rounded-md overflow-hidden bg-black">
+                <div id={PLAYER_ELEMENT_ID} className="w-full h-full" />
+              </div>
+              {!playerReady && <p className="text-sm text-foreground/60 pt-2">Oynatıcı yükleniyor...</p>}
+            </div>
 
-          <div className="flex flex-col gap-2">
-            <h2 className={sectionTitle}>Aktif Oyuncu</h2>
-            <div className="flex flex-wrap gap-2">
-              {playersForSelectedMatch.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedPlayerId(String(p.id))}
-                  className={chip(selectedPlayerId === String(p.id))}
-                >
-                  #{p.jersey_number} {p.name}
+            <div className="flex flex-col gap-2">
+              <h2 className={sectionTitle}>Aktif Oyuncu</h2>
+              <div className="flex flex-wrap gap-2">
+                {playersForSelectedMatch.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => setSelectedPlayerId(String(p.id))}
+                    className={chip(selectedPlayerId === String(p.id))}
+                  >
+                    #{p.jersey_number} {p.name}
+                  </button>
+                ))}
+                {playersForSelectedMatch.length === 0 && (
+                  <p className="text-foreground/60 text-sm">Bu maçın takımı için oyuncu bulunamadı.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <h2 className={sectionTitle}>
+                Saha Bölgesi {selectedZone && "— " + ZONES.find((z) => z.value === selectedZone)?.label}
+              </h2>
+              <div className="grid grid-cols-3 grid-rows-3 gap-1 w-full max-w-56 aspect-[3/4] rounded-md overflow-hidden border border-border">
+                {ZONES.map((z) => (
+                  <button
+                    key={z.value}
+                    onClick={() => setSelectedZone(selectedZone === z.value ? null : z.value)}
+                    className={`flex items-center justify-center text-center text-[10px] leading-tight p-1 transition-colors ${
+                      selectedZone === z.value
+                        ? "bg-accent text-accent-foreground"
+                        : "bg-accent/10 hover:bg-accent/20"
+                    }`}
+                  >
+                    {z.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <h2 className={sectionTitle}>Olay Kaydet</h2>
+                <button onClick={handleUndoLast} disabled={events.length === 0} className={dangerLink}>
+                  Son işlemi geri al
                 </button>
-              ))}
-              {playersForSelectedMatch.length === 0 && (
-                <p className="text-foreground/60 text-sm">Bu maçın takımı için oyuncu bulunamadı.</p>
-              )}
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {EVENT_TYPES.map((et) => (
+                  <button
+                    key={et.key}
+                    onClick={() => logEvent(et.key)}
+                    disabled={!selectedPlayerId || !playerReady}
+                    className={`${secondaryButton} py-3 px-1 text-sm`}
+                  >
+                    {et.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <h2 className={sectionTitle}>
-              Saha Bölgesi {selectedZone && "— " + ZONES.find((z) => z.value === selectedZone)?.label}
-            </h2>
-            <div className="grid grid-cols-3 grid-rows-3 gap-1 w-56 aspect-[3/4] rounded-md overflow-hidden border border-border">
-              {ZONES.map((z) => (
-                <button
-                  key={z.value}
-                  onClick={() => setSelectedZone(selectedZone === z.value ? null : z.value)}
-                  className={`flex items-center justify-center text-center text-[10px] leading-tight p-1 transition-colors ${
-                    selectedZone === z.value
-                      ? "bg-accent text-accent-foreground"
-                      : "bg-accent/10 hover:bg-accent/20"
-                  }`}
-                >
-                  {z.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <h2 className={sectionTitle}>Olay Kaydet</h2>
-              <button onClick={handleUndoLast} disabled={events.length === 0} className={dangerLink}>
-                Son işlemi geri al
-              </button>
-            </div>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-              {EVENT_TYPES.map((et) => (
-                <button
-                  key={et.key}
-                  onClick={() => logEvent(et.key)}
-                  disabled={!selectedPlayerId || !playerReady}
-                  className={`${secondaryButton} py-4`}
-                >
-                  {et.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2">
+          <div className="mt-6 lg:mt-0 flex-1 flex flex-col gap-2 min-w-0">
             <h2 className={sectionTitle}>Olay Akışı</h2>
             {events.length === 0 ? (
               <p className="text-foreground/60 text-sm">Henüz olay kaydedilmedi.</p>
@@ -335,7 +339,7 @@ export default function AnalysisPage() {
               </ul>
             )}
           </div>
-        </>
+        </div>
       )}
     </div>
   );
