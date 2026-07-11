@@ -71,7 +71,7 @@ export default function MatchesPage() {
     <div className="flex flex-col gap-6">
       <h1 className={pageTitle}>Maçlar</h1>
 
-      <form onSubmit={handleAdd} className="flex flex-wrap gap-2">
+      <form onSubmit={handleAdd} className={`${card} flex flex-wrap gap-2`}>
         <select value={teamId} onChange={(e) => setTeamId(e.target.value)} className={input}>
           <option value="">Takım</option>
           {teams.map((team) => (
@@ -109,9 +109,9 @@ export default function MatchesPage() {
       ) : matches.length === 0 ? (
         <p className="text-foreground/60">Henüz maç yok.</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {matches.map((match) => (
-            <li key={match.id} className={`${card} flex items-center justify-between py-3`}>
+            <div key={match.id} className={`${card} flex items-center justify-between`}>
               <span>
                 <span className="font-medium">
                   {teamName(match.team_id)} - {match.opponent_name}
@@ -125,9 +125,9 @@ export default function MatchesPage() {
               <button onClick={() => handleDelete(match.id)} className={dangerLink}>
                 Sil
               </button>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );

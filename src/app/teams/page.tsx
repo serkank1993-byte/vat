@@ -48,7 +48,7 @@ export default function TeamsPage() {
     <div className="flex flex-col gap-6">
       <h1 className={pageTitle}>Takımlar</h1>
 
-      <form onSubmit={handleAdd} className="flex gap-2">
+      <form onSubmit={handleAdd} className={`${card} flex gap-2 max-w-xl`}>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -66,16 +66,16 @@ export default function TeamsPage() {
       ) : teams.length === 0 ? (
         <p className="text-foreground/60">Henüz takım yok.</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {teams.map((team) => (
-            <li key={team.id} className={`${card} flex items-center justify-between py-3`}>
+            <div key={team.id} className={`${card} flex items-center justify-between`}>
               <span className="font-medium">{team.name}</span>
               <button onClick={() => handleDelete(team.id)} className={dangerLink}>
                 Sil
               </button>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );

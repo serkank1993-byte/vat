@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Match, MatchEvent, Player, Team } from "@/lib/types";
 import { card, input, pageTitle, sectionTitle } from "@/lib/ui";
+import StatTile from "@/app/components/StatTile";
 
 export default function DashboardPage() {
   const [teams, setTeams] = useState<Team[]>([]);
@@ -180,6 +181,17 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredEvents, players]);
 
+  const totalGoals = useMemo(() => {
+    return filteredEvents.filter((e) => e.event_type === "goal").length;
+  }, [filteredEvents]);
+
+  const topScorerLabel = useMemo(() => {
+    if (topScorers.length === 0) return "—";
+    const [id, value] = topScorers[0];
+    return `${playerLabel(id)} (${value})`;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topScorers, players]);
+
   return (
     <div className="flex flex-col gap-8">
       <h1 className={pageTitle}>İstatistikler</h1>
@@ -197,6 +209,13 @@ export default function DashboardPage() {
           </option>
         ))}
       </select>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatTile label="Toplam Maç" value={filteredMatches.length} />
+        <StatTile label="Toplam Gol" value={totalGoals} />
+        <StatTile label="Toplam Oyuncu" value={players.length} />
+        <StatTile label="En Golcü" value={topScorerLabel} />
+      </div>
 
       <section className="flex flex-col gap-3">
         <h2 className={sectionTitle}>Takım Karnesi</h2>
@@ -236,7 +255,7 @@ export default function DashboardPage() {
         )}
       </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Leaderboard
           title="Gol Krallığı"
           empty="Henüz gol kaydedilmedi."

@@ -48,7 +48,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <RegisterServiceWorker />
         <NavBar />
-        <main className="flex-1 mx-auto w-full max-w-5xl px-6 py-8">
+        <main className="flex-1 mx-auto w-full max-w-7xl px-6 py-8">
           {children}
         </main>
       </body>

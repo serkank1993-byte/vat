@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/useSession";
 import type { MatchAttendance, MatchEvent, Player } from "@/lib/types";
 import { card, dangerLink, input, pageTitle, primaryButton, secondaryButton, sectionTitle } from "@/lib/ui";
+import StatTile from "@/app/components/StatTile";
 
 const PENDING_TOKEN_KEY = "vat_pending_invite_token";
 
@@ -185,15 +186,15 @@ export default function AccountPage() {
 
       <section className="flex flex-col gap-3">
         <h2 className={sectionTitle}>İstatistiklerim</h2>
-        <div className={`${card} grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm`}>
-          <Stat label="Gol" value={totals.goals} />
-          <Stat label="Asist" value={totals.assists} />
-          <Stat label="Şut (İsabetli)" value={`${totals.shotsOnTarget}/${totals.shots}`} />
-          <Stat label="Pas (İsabetli)" value={`${totals.successfulPasses}/${totals.passes}`} />
-          <Stat label="Müdahale" value={totals.tackles} />
-          <Stat label="Faul" value={totals.fouls} />
-          <Stat label="Maç Kaydı" value={matchesPlayed} />
-          <Stat label="Katılım Oranı" value={attendanceRate !== null ? `%${attendanceRate}` : "—"} />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <StatTile label="Gol" value={totals.goals} />
+          <StatTile label="Asist" value={totals.assists} />
+          <StatTile label="Şut (İsabetli)" value={`${totals.shotsOnTarget}/${totals.shots}`} />
+          <StatTile label="Pas (İsabetli)" value={`${totals.successfulPasses}/${totals.passes}`} />
+          <StatTile label="Müdahale" value={totals.tackles} />
+          <StatTile label="Faul" value={totals.fouls} />
+          <StatTile label="Maç Kaydı" value={matchesPlayed} />
+          <StatTile label="Katılım Oranı" value={attendanceRate !== null ? `%${attendanceRate}` : "—"} />
         </div>
         <div className="flex gap-2">
           <Link href="/dashboard" className={secondaryButton}>
@@ -208,15 +209,6 @@ export default function AccountPage() {
       <button onClick={() => supabase.auth.signOut()} className={`self-start ${dangerLink}`}>
         Çıkış Yap
       </button>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-foreground/60 text-xs uppercase tracking-wide">{label}</span>
-      <span className="text-xl font-semibold">{value}</span>
     </div>
   );
 }

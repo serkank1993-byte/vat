@@ -21,7 +21,7 @@ export default function NavBar() {
 
   return (
     <nav className="sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
-      <div className="mx-auto max-w-5xl flex items-center gap-1 px-6 py-3 text-sm overflow-x-auto">
+      <div className="mx-auto max-w-7xl flex items-center gap-1 px-6 py-3 text-sm overflow-x-auto">
         <Link href="/" className="mr-4 flex items-center gap-2 font-bold text-accent shrink-0">
           <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-accent text-accent-foreground text-xs">
             V

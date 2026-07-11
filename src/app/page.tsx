@@ -20,7 +20,7 @@ export default function Home() {
           etiketleyip performansı analiz et.
         </p>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {SECTIONS.map((s) => (
           <Link key={s.href} href={s.href} className={`${card} hover:border-accent transition-colors`}>
             <h2 className="font-semibold text-lg">{s.title}</h2>

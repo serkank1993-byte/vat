@@ -93,7 +93,7 @@ export default function PlayersPage() {
     <div className="flex flex-col gap-6">
       <h1 className={pageTitle}>Oyuncular</h1>
 
-      <form onSubmit={handleAdd} className="flex flex-wrap gap-2">
+      <form onSubmit={handleAdd} className={`${card} flex flex-wrap gap-2`}>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -132,9 +132,9 @@ export default function PlayersPage() {
       ) : players.length === 0 ? (
         <p className="text-foreground/60">Henüz oyuncu yok.</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {players.map((player) => (
-            <li key={player.id} className={`${card} flex flex-col gap-2 py-3`}>
+            <div key={player.id} className={`${card} flex flex-col gap-2`}>
               <div className="flex items-center justify-between">
                 <span>
                   <span className="font-medium">
@@ -188,9 +188,9 @@ export default function PlayersPage() {
                   )}
                 </div>
               )}
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );
