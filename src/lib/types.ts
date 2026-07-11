@@ -41,3 +41,14 @@ export type MatchStat = {
   goals: number | null;
   created_at: string;
 };
+
+export type MatchEvent = {
+  id: number;
+  match_id: number | null;
+  player_id: number | null;
+  event_type: string;
+  minute: number;
+  second: number | null;
+  description: string | null;
+  created_at: string;
+};

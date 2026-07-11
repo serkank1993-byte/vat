@@ -43,6 +43,9 @@ export default function RootLayout({
             <Link href="/matches" className="hover:underline">
               Matches
             </Link>
+            <Link href="/live" className="hover:underline">
+              Live
+            </Link>
             <Link href="/dashboard" className="hover:underline">
               Dashboard
             </Link>
