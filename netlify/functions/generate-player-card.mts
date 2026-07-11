@@ -76,7 +76,7 @@ const handler = async (req: Request) => {
             },
           ],
           generationConfig: {
-            responseModalities: ["IMAGE"],
+            responseModalities: ["TEXT", "IMAGE"],
           },
         }),
       },
@@ -97,15 +97,30 @@ const handler = async (req: Request) => {
   }
 
   const data = await response.json();
-  const parts: Array<{ inlineData?: { data?: string; mimeType?: string } }> =
-    data?.candidates?.[0]?.content?.parts ?? [];
+
+  const blockReason = data?.promptFeedback?.blockReason;
+  if (blockReason) {
+    return new Response(
+      JSON.stringify({ error: `AI bu fotoğrafı işlemeyi reddetti (${blockReason}). Farklı bir fotoğraf deneyin.` }),
+      { status: 502, headers: { "content-type": "application/json" } },
+    );
+  }
+
+  const candidate = data?.candidates?.[0];
+  const parts: Array<{ inlineData?: { data?: string; mimeType?: string }; text?: string }> =
+    candidate?.content?.parts ?? [];
   const imagePart = parts.find((p) => p.inlineData?.data);
 
   if (!imagePart?.inlineData?.data) {
-    return new Response(JSON.stringify({ error: "AI görsel üretemedi. Farklı bir fotoğraf deneyin." }), {
-      status: 502,
-      headers: { "content-type": "application/json" },
-    });
+    const textPart = parts.find((p) => p.text)?.text;
+    const finishReason = candidate?.finishReason;
+    return new Response(
+      JSON.stringify({
+        error: "AI görsel üretemedi. Farklı bir fotoğraf deneyin.",
+        detail: textPart || finishReason || JSON.stringify(data),
+      }),
+      { status: 502, headers: { "content-type": "application/json" } },
+    );
   }
 
   return new Response(

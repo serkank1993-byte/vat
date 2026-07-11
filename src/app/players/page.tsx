@@ -131,6 +131,7 @@ export default function PlayersPage() {
     setDetailJerseyNumber(String(player.jersey_number));
     setDetailPosition(player.position ?? "");
     setDetailPhotoFile(null);
+    setError(null);
   }
 
   async function saveBasicFields(playerId: number): Promise<boolean> {
@@ -376,6 +377,7 @@ export default function PlayersPage() {
                         {generatingAi ? "Kart Oluşturuluyor..." : "Yapay Zeka ile Profesyonel Kart Oluştur"}
                       </button>
                     </div>
+                    {error && <p className="text-red-600 text-sm">{error}</p>}
                   </div>
                 </div>
               )}
