@@ -240,10 +240,10 @@ export default function AnalysisPage() {
       )}
 
       {selectedMatch && videoId && (
-        <div className="flex flex-col lg:flex-row lg:items-start lg:gap-6">
-          <div className="flex flex-col gap-3 lg:sticky lg:top-20 lg:w-[380px] lg:shrink-0">
-            <div className="sticky top-16 z-10 bg-background pb-2 lg:static lg:pb-0">
-              <div className="aspect-video w-full rounded-md overflow-hidden bg-black">
+        <div className="flex flex-col md:flex-row md:items-start md:gap-6">
+          <div className="flex flex-col gap-3 md:sticky md:top-20 md:w-[340px] md:shrink-0">
+            <div className="sticky top-16 z-10 bg-background pb-2 md:static md:pb-0">
+              <div className="aspect-video w-full max-w-[240px] md:max-w-none rounded-md overflow-hidden bg-black">
                 <div id={PLAYER_ELEMENT_ID} className="w-full h-full" />
               </div>
               {!playerReady && <p className="text-sm text-foreground/60 pt-2">Oynatıcı yükleniyor...</p>}
@@ -310,7 +310,7 @@ export default function AnalysisPage() {
             </div>
           </div>
 
-          <div className="mt-6 lg:mt-0 flex-1 flex flex-col gap-2 min-w-0">
+          <div className="mt-6 md:mt-0 flex-1 flex flex-col gap-2 min-w-0">
             <h2 className={sectionTitle}>Olay Akışı</h2>
             {events.length === 0 ? (
               <p className="text-foreground/60 text-sm">Henüz olay kaydedilmedi.</p>
