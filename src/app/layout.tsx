@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import NavBar from "./components/NavBar";
+import RegisterServiceWorker from "./components/RegisterServiceWorker";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,6 +17,22 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "SahaIçi — Video Taktik Analiz",
   description: "Futbol maç ve video taktik analiz aracı",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "SahaIçi",
+  },
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/icons/apple-touch-icon.png",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#059669",
 };
 
 export default function RootLayout({
@@ -29,6 +46,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <RegisterServiceWorker />
         <NavBar />
         <main className="flex-1 mx-auto w-full max-w-5xl px-6 py-8">
           {children}
