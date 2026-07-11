@@ -19,7 +19,7 @@ const handler = async (req: Request) => {
     });
   }
 
-  const apiKey = Netlify.env.get("GEMINI_API_KEY");
+  const apiKey = Netlify.env.get("GEMINI_API_KEY")?.trim();
   if (!apiKey) {
     return new Response(JSON.stringify({ error: "AI servisi yapılandırılmamış." }), {
       status: 500,
@@ -62,10 +62,10 @@ const handler = async (req: Request) => {
   let response: Response;
   try {
     response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent`,
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
         body: JSON.stringify({
           contents: [
             {
@@ -90,10 +90,11 @@ const handler = async (req: Request) => {
 
   if (!response.ok) {
     const detail = await response.text();
-    return new Response(JSON.stringify({ error: "AI servisi bir hata döndürdü.", detail }), {
-      status: 502,
-      headers: { "content-type": "application/json" },
-    });
+    const keyHint = `${apiKey.slice(0, 6)}...${apiKey.slice(-4)} (uzunluk: ${apiKey.length})`;
+    return new Response(
+      JSON.stringify({ error: "AI servisi bir hata döndürdü.", detail: `${detail} | kullanılan anahtar: ${keyHint}` }),
+      { status: 502, headers: { "content-type": "application/json" } },
+    );
   }
 
   const data = await response.json();
