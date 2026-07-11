@@ -57,3 +57,14 @@ export type MatchEvent = {
   zone: number | null;
   created_at: string;
 };
+
+export type AttendanceStatus = "geliyor" | "gelmiyor" | "belirsiz";
+
+export type MatchAttendance = {
+  id: number;
+  match_id: number | null;
+  player_id: number | null;
+  status: AttendanceStatus;
+  responded_at: string | null;
+  created_at: string;
+};

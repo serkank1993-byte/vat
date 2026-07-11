@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/useSession";
-import type { MatchStat, Player } from "@/lib/types";
+import type { MatchAttendance, MatchStat, Player } from "@/lib/types";
 import { card, dangerLink, input, pageTitle, primaryButton, secondaryButton, sectionTitle } from "@/lib/ui";
 
 const PENDING_TOKEN_KEY = "vat_pending_invite_token";
@@ -14,6 +14,8 @@ export default function AccountPage() {
   const [player, setPlayer] = useState<Player | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [stats, setStats] = useState<MatchStat[]>([]);
+  const [attendance, setAttendance] = useState<MatchAttendance[]>([]);
+  const [teamMatchCount, setTeamMatchCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,13 +44,16 @@ export default function AccountPage() {
       setName(data.name);
       setJerseyNumber(String(data.jersey_number));
       setPosition(data.position ?? "");
-      const statsRes = await supabase
-        .from("match_stats")
-        .select("*")
-        .eq("player_id", data.id)
-        .order("created_at", { ascending: false });
+      const [statsRes, attendanceRes, matchesRes] = await Promise.all([
+        supabase.from("match_stats").select("*").eq("player_id", data.id).order("created_at", { ascending: false }),
+        supabase.from("match_attendance").select("*").eq("player_id", data.id),
+        supabase.from("matches").select("id", { count: "exact", head: true }).eq("team_id", data.team_id),
+      ]);
       if (statsRes.error) setError(statsRes.error.message);
       else setStats(statsRes.data ?? []);
+      if (attendanceRes.error) setError(attendanceRes.error.message);
+      else setAttendance(attendanceRes.data ?? []);
+      setTeamMatchCount(matchesRes.count ?? 0);
     }
     setLoading(false);
   }
@@ -96,6 +101,9 @@ export default function AccountPage() {
     }),
     { goals: 0, assists: 0, passes: 0, successfulPasses: 0, shots: 0, shotsOnTarget: 0, tackles: 0, fouls: 0 },
   );
+
+  const attendingCount = attendance.filter((a) => a.status === "geliyor").length;
+  const attendanceRate = teamMatchCount > 0 ? Math.round((attendingCount / teamMatchCount) * 100) : null;
 
   if (sessionLoading || loading) return <p className="text-foreground/60">Yükleniyor...</p>;
 
@@ -183,10 +191,16 @@ export default function AccountPage() {
           <Stat label="Müdahale" value={totals.tackles} />
           <Stat label="Faul" value={totals.fouls} />
           <Stat label="Maç Kaydı" value={stats.length} />
+          <Stat label="Katılım Oranı" value={attendanceRate !== null ? `%${attendanceRate}` : "—"} />
         </div>
-        <Link href="/dashboard" className={`self-start ${secondaryButton}`}>
-          Takım İstatistiklerini Gör
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/dashboard" className={secondaryButton}>
+            Takım İstatistiklerini Gör
+          </Link>
+          <Link href="/katilim" className={secondaryButton}>
+            Maç Katılımlarım
+          </Link>
+        </div>
       </section>
 
       <button onClick={() => supabase.auth.signOut()} className={`self-start ${dangerLink}`}>
