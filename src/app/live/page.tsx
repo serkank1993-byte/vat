@@ -114,11 +114,28 @@ export default function LivePage() {
 
   const selectedMatch = matches.find((m) => m.id === Number(matchId));
 
-  async function logEvent(eventType: string) {
+  function logEvent(eventType: string) {
     if (!matchId || !selectedPlayerId) return;
     const minute = Math.floor(elapsedSeconds / 60);
     const second = elapsedSeconds % 60;
-    const { data, error } = await supabase
+    // eslint-disable-next-line react-hooks/purity -- runs in a click handler, not during render
+    const tempId = -Date.now();
+    const optimisticEvent: MatchEvent = {
+      id: tempId,
+      match_id: Number(matchId),
+      player_id: Number(selectedPlayerId),
+      event_type: eventType,
+      minute,
+      second,
+      description: null,
+      zone: selectedZone,
+      created_at: new Date().toISOString(),
+    };
+    // Show the tap instantly; reconcile with the server in the background
+    // so a slow connection never makes live entry feel like it dropped.
+    setEvents((prev) => [optimisticEvent, ...prev]);
+
+    supabase
       .from("events")
       .insert({
         match_id: Number(matchId),
@@ -129,15 +146,43 @@ export default function LivePage() {
         zone: selectedZone,
       })
       .select()
-      .single();
-    if (error) setError(error.message);
-    else if (data) setEvents((prev) => [data, ...prev]);
+      .single()
+      .then(({ data, error }) => {
+        if (error) {
+          setError(error.message);
+          setEvents((prev) => prev.filter((e) => e.id !== tempId));
+        } else if (data) {
+          setEvents((prev) => prev.map((e) => (e.id === tempId ? data : e)));
+        }
+      });
   }
 
-  async function handleDeleteEvent(id: number) {
-    const { error } = await supabase.from("events").delete().eq("id", id);
-    if (error) setError(error.message);
-    else setEvents((prev) => prev.filter((e) => e.id !== id));
+  function handleUndoLast() {
+    const last = events[0];
+    if (!last) return;
+    setEvents((prev) => prev.slice(1));
+    if (last.id > 0) {
+      supabase
+        .from("events")
+        .delete()
+        .eq("id", last.id)
+        .then(({ error }) => {
+          if (error) setError(error.message);
+        });
+    }
+  }
+
+  function handleDeleteEvent(id: number) {
+    setEvents((prev) => prev.filter((e) => e.id !== id));
+    if (id > 0) {
+      supabase
+        .from("events")
+        .delete()
+        .eq("id", id)
+        .then(({ error }) => {
+          if (error) setError(error.message);
+        });
+    }
   }
 
   function playerLabel(id: number | null) {
@@ -193,7 +238,7 @@ export default function LivePage() {
                 <button
                   key={p.id}
                   onClick={() => setSelectedPlayerId(String(p.id))}
-                  className={`rounded-md border px-3 py-2 text-sm ${
+                  className={`rounded-md border px-4 py-3 text-base font-medium ${
                     selectedPlayerId === String(p.id)
                       ? "bg-foreground text-background border-transparent"
                       : "border-black/10 dark:border-white/20"
@@ -232,14 +277,23 @@ export default function LivePage() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <h2 className="text-sm font-medium text-black/70 dark:text-white/70">Log event</h2>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-medium text-black/70 dark:text-white/70">Log event</h2>
+              <button
+                onClick={handleUndoLast}
+                disabled={events.length === 0}
+                className="text-sm text-red-600 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Undo last
+              </button>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
               {EVENT_TYPES.map((et) => (
                 <button
                   key={et.key}
                   onClick={() => logEvent(et.key)}
                   disabled={!selectedPlayerId}
-                  className="rounded-md border border-black/10 dark:border-white/20 px-3 py-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:bg-black/5 dark:hover:bg-white/10"
+                  className="rounded-lg border border-black/10 dark:border-white/20 px-3 py-4 text-base font-medium active:scale-95 transition-transform disabled:opacity-40 disabled:cursor-not-allowed hover:bg-black/5 dark:hover:bg-white/10"
                 >
                   {et.label}
                 </button>
@@ -256,7 +310,9 @@ export default function LivePage() {
                 {events.map((ev) => (
                   <li
                     key={ev.id}
-                    className="flex items-center justify-between rounded-md border border-black/10 dark:border-white/10 px-4 py-2 text-sm"
+                    className={`flex items-center justify-between rounded-md border border-black/10 dark:border-white/10 px-4 py-2 text-sm ${
+                      ev.id < 0 ? "opacity-50" : ""
+                    }`}
                   >
                     <span>
                       <span className="font-mono">
