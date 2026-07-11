@@ -10,6 +10,9 @@ export type Player = {
   name: string;
   jersey_number: number;
   position: string | null;
+  user_id: string | null;
+  role: "player" | "captain";
+  invite_token: string | null;
   created_at: string;
 };
 

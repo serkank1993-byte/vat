@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import { useSession } from "@/lib/useSession";
 
 const LINKS = [
   { href: "/teams", label: "Takımlar" },
@@ -14,6 +16,7 @@ const LINKS = [
 
 export default function NavBar() {
   const pathname = usePathname();
+  const { session } = useSession();
 
   return (
     <nav className="sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
@@ -22,7 +25,7 @@ export default function NavBar() {
           <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-accent text-accent-foreground text-xs">
             V
           </span>
-          SahaIci
+          SahaIçi
         </Link>
         {LINKS.map((link) => {
           const active = pathname === link.href;
@@ -40,6 +43,39 @@ export default function NavBar() {
             </Link>
           );
         })}
+        <div className="ml-auto flex items-center gap-1 shrink-0">
+          {session ? (
+            <>
+              <Link
+                href="/hesabim"
+                className={`rounded-md px-3 py-1.5 font-medium transition ${
+                  pathname === "/hesabim"
+                    ? "bg-accent text-accent-foreground"
+                    : "text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+                }`}
+              >
+                Hesabım
+              </Link>
+              <button
+                onClick={() => supabase.auth.signOut()}
+                className="rounded-md px-3 py-1.5 font-medium text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+              >
+                Çıkış
+              </button>
+            </>
+          ) : (
+            <Link
+              href="/giris"
+              className={`rounded-md px-3 py-1.5 font-medium transition ${
+                pathname === "/giris"
+                  ? "bg-accent text-accent-foreground"
+                  : "text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+              }`}
+            >
+              Giriş Yap
+            </Link>
+          )}
+        </div>
       </div>
     </nav>
   );

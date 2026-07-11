@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Player, Team } from "@/lib/types";
-import { card, dangerLink, input, pageTitle, primaryButton } from "@/lib/ui";
+import { card, dangerLink, input, pageTitle, primaryButton, secondaryButton } from "@/lib/ui";
 
 export default function PlayersPage() {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -14,6 +14,8 @@ export default function PlayersPage() {
   const [teamId, setTeamId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [inviteLinks, setInviteLinks] = useState<Record<number, string>>({});
+  const [copiedId, setCopiedId] = useState<number | null>(null);
 
   async function loadData() {
     setLoading(true);
@@ -55,6 +57,32 @@ export default function PlayersPage() {
     const { error } = await supabase.from("players").delete().eq("id", id);
     if (error) setError(error.message);
     else loadData();
+  }
+
+  async function handleToggleCaptain(player: Player) {
+    const newRole = player.role === "captain" ? "player" : "captain";
+    const { error } = await supabase.from("players").update({ role: newRole }).eq("id", player.id);
+    if (error) setError(error.message);
+    else loadData();
+  }
+
+  async function handleGenerateInvite(player: Player) {
+    const token = player.invite_token ?? crypto.randomUUID();
+    if (!player.invite_token) {
+      const { error } = await supabase.from("players").update({ invite_token: token }).eq("id", player.id);
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      setPlayers((prev) => prev.map((p) => (p.id === player.id ? { ...p, invite_token: token } : p)));
+    }
+    setInviteLinks((prev) => ({ ...prev, [player.id]: `${window.location.origin}/kayit?token=${token}` }));
+  }
+
+  async function handleCopy(id: number, link: string) {
+    await navigator.clipboard.writeText(link);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
   }
 
   function teamName(id: number | null) {
@@ -106,18 +134,60 @@ export default function PlayersPage() {
       ) : (
         <ul className="flex flex-col gap-2">
           {players.map((player) => (
-            <li key={player.id} className={`${card} flex items-center justify-between py-3`}>
-              <span>
-                <span className="font-medium">
-                  #{player.jersey_number} {player.name}
-                </span>{" "}
-                <span className="text-foreground/50">
-                  {player.position ?? ""} · {teamName(player.team_id)}
+            <li key={player.id} className={`${card} flex flex-col gap-2 py-3`}>
+              <div className="flex items-center justify-between">
+                <span>
+                  <span className="font-medium">
+                    #{player.jersey_number} {player.name}
+                  </span>{" "}
+                  <span className="text-foreground/50">
+                    {player.position ?? ""} · {teamName(player.team_id)}
+                  </span>
+                  {player.role === "captain" && (
+                    <span className="ml-2 rounded-full bg-accent/15 text-accent text-xs px-2 py-0.5">
+                      Kaptan
+                    </span>
+                  )}
+                  {player.user_id && (
+                    <span className="ml-2 rounded-full bg-foreground/10 text-foreground/60 text-xs px-2 py-0.5">
+                      Hesabı var
+                    </span>
+                  )}
                 </span>
-              </span>
-              <button onClick={() => handleDelete(player.id)} className={dangerLink}>
-                Sil
-              </button>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => handleToggleCaptain(player)} className="text-sm text-accent hover:underline">
+                    {player.role === "captain" ? "Kaptanlıktan çıkar" : "Kaptan yap"}
+                  </button>
+                  <button onClick={() => handleDelete(player.id)} className={dangerLink}>
+                    Sil
+                  </button>
+                </div>
+              </div>
+
+              {!player.user_id && (
+                <div className="flex items-center gap-2">
+                  {inviteLinks[player.id] ? (
+                    <>
+                      <input
+                        readOnly
+                        value={inviteLinks[player.id]}
+                        className={`flex-1 text-xs ${input}`}
+                        onFocus={(e) => e.target.select()}
+                      />
+                      <button
+                        onClick={() => handleCopy(player.id, inviteLinks[player.id])}
+                        className={secondaryButton}
+                      >
+                        {copiedId === player.id ? "Kopyalandı" : "Kopyala"}
+                      </button>
+                    </>
+                  ) : (
+                    <button onClick={() => handleGenerateInvite(player)} className={secondaryButton}>
+                      Davet Linki Oluştur
+                    </button>
+                  )}
+                </div>
+              )}
             </li>
           ))}
         </ul>
