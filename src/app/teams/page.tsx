@@ -6,12 +6,12 @@ import type { Team } from "@/lib/types";
 import { card, dangerLink, input, pageTitle, primaryButton, secondaryButton } from "@/lib/ui";
 import TeamRecordsPanel from "@/app/components/TeamRecordsPanel";
 
-async function uploadJersey(teamId: number, file: File): Promise<string | null> {
+async function uploadTeamImage(bucket: string, teamId: number, file: File): Promise<string | null> {
   const ext = file.name.split(".").pop() ?? "png";
   const path = `${teamId}-${Date.now()}.${ext}`;
-  const { error: uploadError } = await supabase.storage.from("team-jerseys").upload(path, file, { upsert: true });
+  const { error: uploadError } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
   if (uploadError) return null;
-  const { data } = supabase.storage.from("team-jerseys").getPublicUrl(path);
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
 }
 
@@ -25,12 +25,14 @@ export default function TeamsPage() {
   const [primaryColor, setPrimaryColor] = useState("");
   const [secondaryColor, setSecondaryColor] = useState("");
   const [jerseyFile, setJerseyFile] = useState<File | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editFoundedDate, setEditFoundedDate] = useState("");
   const [editPrimaryColor, setEditPrimaryColor] = useState("");
   const [editSecondaryColor, setEditSecondaryColor] = useState("");
   const [editJerseyFile, setEditJerseyFile] = useState<File | null>(null);
+  const [editLogoFile, setEditLogoFile] = useState<File | null>(null);
 
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
@@ -68,14 +70,19 @@ export default function TeamsPage() {
       return;
     }
     if (jerseyFile && data) {
-      const url = await uploadJersey(data.id, jerseyFile);
+      const url = await uploadTeamImage("team-jerseys", data.id, jerseyFile);
       if (url) await supabase.from("teams").update({ jersey_image_url: url }).eq("id", data.id);
+    }
+    if (logoFile && data) {
+      const url = await uploadTeamImage("team-logos", data.id, logoFile);
+      if (url) await supabase.from("teams").update({ logo_url: url }).eq("id", data.id);
     }
     setName("");
     setFoundedDate("");
     setPrimaryColor("");
     setSecondaryColor("");
     setJerseyFile(null);
+    setLogoFile(null);
     loadTeams();
   }
 
@@ -91,6 +98,7 @@ export default function TeamsPage() {
     setEditPrimaryColor(team.primary_color ?? "");
     setEditSecondaryColor(team.secondary_color ?? "");
     setEditJerseyFile(null);
+    setEditLogoFile(null);
   }
 
   async function handleSaveEdit(team: Team) {
@@ -107,8 +115,12 @@ export default function TeamsPage() {
       return;
     }
     if (editJerseyFile) {
-      const url = await uploadJersey(team.id, editJerseyFile);
+      const url = await uploadTeamImage("team-jerseys", team.id, editJerseyFile);
       if (url) await supabase.from("teams").update({ jersey_image_url: url }).eq("id", team.id);
+    }
+    if (editLogoFile) {
+      const url = await uploadTeamImage("team-logos", team.id, editLogoFile);
+      if (url) await supabase.from("teams").update({ logo_url: url }).eq("id", team.id);
     }
     setEditingId(null);
     loadTeams();
@@ -154,15 +166,26 @@ export default function TeamsPage() {
             />
           </label>
         </div>
-        <label className="flex flex-col gap-1 text-sm text-foreground/70">
-          Forma Görseli
-          <input
-            onChange={(e) => setJerseyFile(e.target.files?.[0] ?? null)}
-            type="file"
-            accept="image/*"
-            className="text-sm"
-          />
-        </label>
+        <div className="flex flex-wrap gap-4">
+          <label className="flex flex-col gap-1 text-sm text-foreground/70">
+            Logo Görseli
+            <input
+              onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
+              type="file"
+              accept="image/*"
+              className="text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm text-foreground/70">
+            Forma Görseli
+            <input
+              onChange={(e) => setJerseyFile(e.target.files?.[0] ?? null)}
+              type="file"
+              accept="image/*"
+              className="text-sm"
+            />
+          </label>
+        </div>
         <button type="submit" className={`self-start ${primaryButton}`}>
           Ekle
         </button>
@@ -209,15 +232,26 @@ export default function TeamsPage() {
                       />
                     </label>
                   </div>
-                  <label className="flex flex-col gap-1 text-sm text-foreground/70">
-                    Forma Görseli
-                    <input
-                      onChange={(e) => setEditJerseyFile(e.target.files?.[0] ?? null)}
-                      type="file"
-                      accept="image/*"
-                      className="text-sm"
-                    />
-                  </label>
+                  <div className="flex flex-wrap gap-4">
+                    <label className="flex flex-col gap-1 text-sm text-foreground/70">
+                      Logo Görseli
+                      <input
+                        onChange={(e) => setEditLogoFile(e.target.files?.[0] ?? null)}
+                        type="file"
+                        accept="image/*"
+                        className="text-sm"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm text-foreground/70">
+                      Forma Görseli
+                      <input
+                        onChange={(e) => setEditJerseyFile(e.target.files?.[0] ?? null)}
+                        type="file"
+                        accept="image/*"
+                        className="text-sm"
+                      />
+                    </label>
+                  </div>
                   <div className="flex items-center gap-3">
                     <button onClick={() => handleSaveEdit(team)} className={primaryButton}>
                       Kaydet
@@ -230,6 +264,18 @@ export default function TeamsPage() {
               ) : (
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
+                    {team.logo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={team.logo_url}
+                        alt={`${team.name} logosu`}
+                        className="h-12 w-12 rounded-full object-cover border border-border shrink-0"
+                      />
+                    ) : (
+                      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent font-semibold">
+                        {team.name.charAt(0).toUpperCase()}
+                      </span>
+                    )}
                     {team.jersey_image_url && (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img

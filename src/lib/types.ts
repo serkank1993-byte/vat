@@ -5,6 +5,7 @@ export type Team = {
   primary_color: string | null;
   secondary_color: string | null;
   jersey_image_url: string | null;
+  logo_url: string | null;
   created_at: string;
 };
 
