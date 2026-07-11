@@ -46,6 +46,9 @@ export default function RootLayout({
             <Link href="/live" className="hover:underline">
               Live
             </Link>
+            <Link href="/analysis" className="hover:underline">
+              Analysis
+            </Link>
             <Link href="/dashboard" className="hover:underline">
               Dashboard
             </Link>

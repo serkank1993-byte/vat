@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Match, MatchEvent, Player, Team } from "@/lib/types";
-import { EVENT_TYPES, ZONES, formatClock } from "@/lib/match-tracking";
+import { EVENT_TYPES, ZONES } from "@/lib/match-tracking";
+import { extractYouTubeId, loadYouTubeIframeApi, type YTPlayer } from "@/lib/youtube";
 
-export default function LivePage() {
+const PLAYER_ELEMENT_ID = "vat-youtube-player";
+
+export default function AnalysisPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -13,12 +16,13 @@ export default function LivePage() {
   const [error, setError] = useState<string | null>(null);
 
   const [matchId, setMatchId] = useState("");
+  const [videoUrlInput, setVideoUrlInput] = useState("");
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
   const [selectedZone, setSelectedZone] = useState<number | null>(null);
   const [events, setEvents] = useState<MatchEvent[]>([]);
+  const [playerReady, setPlayerReady] = useState(false);
 
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [running, setRunning] = useState(false);
+  const ytPlayerRef = useRef<YTPlayer | null>(null);
 
   async function loadBaseData() {
     setLoading(true);
@@ -39,13 +43,8 @@ export default function LivePage() {
     loadBaseData();
   }, []);
 
-  useEffect(() => {
-    if (!running) return;
-    const interval = setInterval(() => {
-      setElapsedSeconds((s) => s + 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [running]);
+  const selectedMatch = matches.find((m) => m.id === Number(matchId));
+  const videoId = selectedMatch?.video_url ? extractYouTubeId(selectedMatch.video_url) : null;
 
   async function loadEvents(forMatchId: string) {
     if (!forMatchId) {
@@ -66,27 +65,72 @@ export default function LivePage() {
     setMatchId(id);
     setSelectedPlayerId("");
     setSelectedZone(null);
-    setElapsedSeconds(0);
-    setRunning(false);
+    setPlayerReady(false);
+    ytPlayerRef.current = null;
+    const match = matches.find((m) => m.id === Number(id));
+    setVideoUrlInput(match?.video_url ?? "");
     loadEvents(id);
   }
 
+  async function handleSaveVideoUrl(e: React.FormEvent) {
+    e.preventDefault();
+    if (!matchId || !videoUrlInput.trim()) return;
+    if (!extractYouTubeId(videoUrlInput.trim())) {
+      setError("That doesn't look like a valid YouTube link.");
+      return;
+    }
+    const { error } = await supabase
+      .from("matches")
+      .update({ video_url: videoUrlInput.trim() })
+      .eq("id", Number(matchId));
+    if (error) setError(error.message);
+    else {
+      setMatches((prev) =>
+        prev.map((m) => (m.id === Number(matchId) ? { ...m, video_url: videoUrlInput.trim() } : m)),
+      );
+    }
+  }
+
+  useEffect(() => {
+    if (!videoId) return;
+    let cancelled = false;
+    loadYouTubeIframeApi().then(() => {
+      if (cancelled || !window.YT) return;
+      ytPlayerRef.current = new window.YT.Player(PLAYER_ELEMENT_ID, {
+        videoId,
+        events: {
+          onReady: (e) => {
+            ytPlayerRef.current = e.target;
+            setPlayerReady(true);
+          },
+        },
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [videoId]);
+
   const playersForSelectedMatch = useMemo(() => {
-    const match = matches.find((m) => m.id === Number(matchId));
-    if (!match) return [];
-    return players.filter((p) => p.team_id === match.team_id);
-  }, [matchId, matches, players]);
+    if (!selectedMatch) return [];
+    return players.filter((p) => p.team_id === selectedMatch.team_id);
+  }, [selectedMatch, players]);
 
   function teamName(id: number | null) {
     return teams.find((t) => t.id === id)?.name ?? "—";
   }
 
-  const selectedMatch = matches.find((m) => m.id === Number(matchId));
+  function playerLabel(id: number | null) {
+    const player = players.find((p) => p.id === id);
+    if (!player) return "—";
+    return `#${player.jersey_number} ${player.name}`;
+  }
 
   function logEvent(eventType: string) {
     if (!matchId || !selectedPlayerId) return;
-    const minute = Math.floor(elapsedSeconds / 60);
-    const second = elapsedSeconds % 60;
+    const currentTime = ytPlayerRef.current?.getCurrentTime() ?? 0;
+    const minute = Math.floor(currentTime / 60);
+    const second = Math.floor(currentTime % 60);
     // eslint-disable-next-line react-hooks/purity -- runs in a click handler, not during render
     const tempId = -Date.now();
     const optimisticEvent: MatchEvent = {
@@ -100,8 +144,6 @@ export default function LivePage() {
       zone: selectedZone,
       created_at: new Date().toISOString(),
     };
-    // Show the tap instantly; reconcile with the server in the background
-    // so a slow connection never makes live entry feel like it dropped.
     setEvents((prev) => [optimisticEvent, ...prev]);
 
     supabase
@@ -154,15 +196,14 @@ export default function LivePage() {
     }
   }
 
-  function playerLabel(id: number | null) {
-    const player = players.find((p) => p.id === id);
-    if (!player) return "—";
-    return `#${player.jersey_number} ${player.name}`;
+  function seekTo(minute: number, second: number | null) {
+    ytPlayerRef.current?.seekTo(minute * 60 + (second ?? 0), true);
+    ytPlayerRef.current?.playVideo();
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Live Match Tracking</h1>
+      <h1 className="text-2xl font-semibold">Video Analysis</h1>
       {error && <p className="text-red-600 text-sm">{error}</p>}
       {loading && <p>Loading...</p>}
 
@@ -179,26 +220,35 @@ export default function LivePage() {
         ))}
       </select>
 
-      {selectedMatch && (
+      {selectedMatch && !selectedMatch.video_url && (
+        <form onSubmit={handleSaveVideoUrl} className="flex gap-2">
+          <input
+            value={videoUrlInput}
+            onChange={(e) => setVideoUrlInput(e.target.value)}
+            placeholder="Paste the YouTube match link"
+            className="flex-1 rounded-md border border-black/10 dark:border-white/20 px-3 py-2 bg-transparent"
+          />
+          <button
+            type="submit"
+            className="rounded-md bg-foreground text-background px-4 py-2 font-medium"
+          >
+            Save video
+          </button>
+        </form>
+      )}
+
+      {selectedMatch && selectedMatch.video_url && !videoId && (
+        <p className="text-red-600 text-sm">
+          Saved video link doesn&apos;t look like a valid YouTube URL.
+        </p>
+      )}
+
+      {selectedMatch && videoId && (
         <>
-          <div className="flex items-center gap-4 rounded-md border border-black/10 dark:border-white/10 px-4 py-3">
-            <span className="text-3xl font-mono tabular-nums">{formatClock(elapsedSeconds)}</span>
-            <button
-              onClick={() => setRunning((r) => !r)}
-              className="rounded-md bg-foreground text-background px-4 py-2 font-medium"
-            >
-              {running ? "Pause" : "Start"}
-            </button>
-            <button
-              onClick={() => {
-                setRunning(false);
-                setElapsedSeconds(0);
-              }}
-              className="rounded-md border border-black/10 dark:border-white/20 px-4 py-2"
-            >
-              Reset
-            </button>
+          <div className="aspect-video w-full max-w-2xl rounded-md overflow-hidden bg-black">
+            <div id={PLAYER_ELEMENT_ID} className="w-full h-full" />
           </div>
+          {!playerReady && <p className="text-sm text-black/60 dark:text-white/60">Loading player...</p>}
 
           <div className="flex flex-col gap-2">
             <h2 className="text-sm font-medium text-black/70 dark:text-white/70">Active player</h2>
@@ -261,7 +311,7 @@ export default function LivePage() {
                 <button
                   key={et.key}
                   onClick={() => logEvent(et.key)}
-                  disabled={!selectedPlayerId}
+                  disabled={!selectedPlayerId || !playerReady}
                   className="rounded-lg border border-black/10 dark:border-white/20 px-3 py-4 text-base font-medium active:scale-95 transition-transform disabled:opacity-40 disabled:cursor-not-allowed hover:bg-black/5 dark:hover:bg-white/10"
                 >
                   {et.label}
@@ -283,14 +333,17 @@ export default function LivePage() {
                       ev.id < 0 ? "opacity-50" : ""
                     }`}
                   >
-                    <span>
+                    <button
+                      onClick={() => seekTo(ev.minute, ev.second)}
+                      className="text-left hover:underline"
+                    >
                       <span className="font-mono">
                         {ev.minute}:{(ev.second ?? 0).toString().padStart(2, "0")}
                       </span>{" "}
                       — {playerLabel(ev.player_id)} —{" "}
                       {EVENT_TYPES.find((et) => et.key === ev.event_type)?.label ?? ev.event_type}
                       {ev.zone && ` — ${ZONES.find((z) => z.value === ev.zone)?.label}`}
-                    </span>
+                    </button>
                     <button
                       onClick={() => handleDeleteEvent(ev.id)}
                       className="text-sm text-red-600 hover:underline"

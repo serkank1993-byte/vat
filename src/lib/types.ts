@@ -22,6 +22,7 @@ export type Match = {
   score_for: number | null;
   score_against: number | null;
   status: string | null;
+  video_url: string | null;
   created_at: string;
 };
 
