@@ -116,7 +116,7 @@ export default function AccountPage() {
         <h1 className={pageTitle}>Hesabım</h1>
         {error && <p className="text-red-600 text-sm">{error}</p>}
         <p className="text-foreground/70">
-          Hesabın henüz bir oyuncu kaydına bağlı değil. Koçundan/kaptanından bir davet linki iste.
+          Hesabın henüz bir oyuncu kaydına bağlı değil. Kaptanından bir davet linki iste.
         </p>
       </div>
     );

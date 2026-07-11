@@ -52,7 +52,7 @@ export default function LoginPage() {
         </button>
       </form>
       <p className="text-sm text-foreground/60">
-        Hesabın yok mu? Koçundan/kaptanından bir davet linki istemen gerekiyor.
+        Hesabın yok mu? Kaptanından bir davet linki istemen gerekiyor.
       </p>
     </div>
   );
