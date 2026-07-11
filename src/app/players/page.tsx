@@ -197,7 +197,10 @@ export default function PlayersPage() {
       });
       const data = await res.json();
       if (!res.ok || !data.imageBase64) {
-        setError(data.error ?? "Yapay zeka kartı oluşturulamadı.");
+        const baseMessage = data.error ?? "Yapay zeka kartı oluşturulamadı.";
+        const detail =
+          typeof data.detail === "string" ? data.detail : data.detail ? JSON.stringify(data.detail) : null;
+        setError(detail ? `${baseMessage} — ${detail.slice(0, 400)}` : baseMessage);
         setGeneratingAi(false);
         return;
       }
