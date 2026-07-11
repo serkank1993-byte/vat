@@ -34,6 +34,7 @@ export type Player = {
   user_id: string | null;
   role: "player" | "captain";
   invite_token: string | null;
+  photo_url: string | null;
   created_at: string;
 };
 

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Player, Team } from "@/lib/types";
 import { card, dangerLink, input, pageTitle, primaryButton, secondaryButton } from "@/lib/ui";
+import { uploadImage } from "@/lib/storage";
+import PlayerCard from "@/app/components/PlayerCard";
 
 export default function PlayersPage() {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -16,6 +18,13 @@ export default function PlayersPage() {
   const [error, setError] = useState<string | null>(null);
   const [inviteLinks, setInviteLinks] = useState<Record<number, string>>({});
   const [copiedId, setCopiedId] = useState<number | null>(null);
+
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [detailName, setDetailName] = useState("");
+  const [detailJerseyNumber, setDetailJerseyNumber] = useState("");
+  const [detailPosition, setDetailPosition] = useState("");
+  const [detailPhotoFile, setDetailPhotoFile] = useState<File | null>(null);
+  const [savingDetail, setSavingDetail] = useState(false);
 
   async function loadData() {
     setLoading(true);
@@ -89,6 +98,42 @@ export default function PlayersPage() {
     return teams.find((t) => t.id === id)?.name ?? "—";
   }
 
+  function toggleExpand(player: Player) {
+    if (expandedId === player.id) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(player.id);
+    setDetailName(player.name);
+    setDetailJerseyNumber(String(player.jersey_number));
+    setDetailPosition(player.position ?? "");
+    setDetailPhotoFile(null);
+  }
+
+  async function handleSaveDetail(player: Player) {
+    if (!detailName.trim() || !detailJerseyNumber) return;
+    setSavingDetail(true);
+    const { error } = await supabase
+      .from("players")
+      .update({
+        name: detailName,
+        jersey_number: Number(detailJerseyNumber),
+        position: detailPosition || null,
+      })
+      .eq("id", player.id);
+    if (error) {
+      setError(error.message);
+      setSavingDetail(false);
+      return;
+    }
+    if (detailPhotoFile) {
+      const url = await uploadImage("player-photos", player.id, detailPhotoFile);
+      if (url) await supabase.from("players").update({ photo_url: url }).eq("id", player.id);
+    }
+    setSavingDetail(false);
+    loadData();
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <h1 className={pageTitle}>Oyuncular</h1>
@@ -137,9 +182,12 @@ export default function PlayersPage() {
             <div key={player.id} className={`${card} flex flex-col gap-2`}>
               <div className="flex items-center justify-between">
                 <span>
-                  <span className="font-medium">
+                  <button
+                    onClick={() => toggleExpand(player)}
+                    className="font-medium hover:underline"
+                  >
                     #{player.jersey_number} {player.name}
-                  </span>{" "}
+                  </button>{" "}
                   <span className="text-foreground/50">
                     {player.position ?? ""} · {teamName(player.team_id)}
                   </span>
@@ -186,6 +234,57 @@ export default function PlayersPage() {
                       Davet Linki Oluştur
                     </button>
                   )}
+                </div>
+              )}
+
+              {expandedId === player.id && (
+                <div className="flex flex-col sm:flex-row gap-4 border-t border-border pt-4 mt-1">
+                  <PlayerCard player={player} team={teams.find((t) => t.id === player.team_id) ?? null} />
+                  <div className="flex-1 flex flex-col gap-3">
+                    <label className="flex flex-col gap-1 text-sm text-foreground/70">
+                      Ad Soyad
+                      <input
+                        value={detailName}
+                        onChange={(e) => setDetailName(e.target.value)}
+                        className={input}
+                      />
+                    </label>
+                    <div className="flex gap-3">
+                      <label className="flex flex-col gap-1 text-sm text-foreground/70">
+                        Forma No
+                        <input
+                          value={detailJerseyNumber}
+                          onChange={(e) => setDetailJerseyNumber(e.target.value)}
+                          type="number"
+                          className={`w-24 ${input}`}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-sm text-foreground/70">
+                        Mevki
+                        <input
+                          value={detailPosition}
+                          onChange={(e) => setDetailPosition(e.target.value)}
+                          className={input}
+                        />
+                      </label>
+                    </div>
+                    <label className="flex flex-col gap-1 text-sm text-foreground/70">
+                      Kart Fotoğrafı
+                      <input
+                        onChange={(e) => setDetailPhotoFile(e.target.files?.[0] ?? null)}
+                        type="file"
+                        accept="image/*"
+                        className="text-sm"
+                      />
+                    </label>
+                    <button
+                      onClick={() => handleSaveDetail(player)}
+                      disabled={savingDetail}
+                      className={`self-start ${primaryButton}`}
+                    >
+                      {savingDetail ? "Kaydediliyor..." : "Kaydet"}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

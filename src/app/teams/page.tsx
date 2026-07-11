@@ -5,15 +5,7 @@ import { supabase } from "@/lib/supabase";
 import type { Team } from "@/lib/types";
 import { card, dangerLink, input, pageTitle, primaryButton, secondaryButton } from "@/lib/ui";
 import TeamRecordsPanel from "@/app/components/TeamRecordsPanel";
-
-async function uploadTeamImage(bucket: string, teamId: number, file: File): Promise<string | null> {
-  const ext = file.name.split(".").pop() ?? "png";
-  const path = `${teamId}-${Date.now()}.${ext}`;
-  const { error: uploadError } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
-  if (uploadError) return null;
-  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-  return data.publicUrl;
-}
+import { uploadImage } from "@/lib/storage";
 
 export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
@@ -70,11 +62,11 @@ export default function TeamsPage() {
       return;
     }
     if (jerseyFile && data) {
-      const url = await uploadTeamImage("team-jerseys", data.id, jerseyFile);
+      const url = await uploadImage("team-jerseys", data.id, jerseyFile);
       if (url) await supabase.from("teams").update({ jersey_image_url: url }).eq("id", data.id);
     }
     if (logoFile && data) {
-      const url = await uploadTeamImage("team-logos", data.id, logoFile);
+      const url = await uploadImage("team-logos", data.id, logoFile);
       if (url) await supabase.from("teams").update({ logo_url: url }).eq("id", data.id);
     }
     setName("");
@@ -115,11 +107,11 @@ export default function TeamsPage() {
       return;
     }
     if (editJerseyFile) {
-      const url = await uploadTeamImage("team-jerseys", team.id, editJerseyFile);
+      const url = await uploadImage("team-jerseys", team.id, editJerseyFile);
       if (url) await supabase.from("teams").update({ jersey_image_url: url }).eq("id", team.id);
     }
     if (editLogoFile) {
-      const url = await uploadTeamImage("team-logos", team.id, editLogoFile);
+      const url = await uploadImage("team-logos", team.id, editLogoFile);
       if (url) await supabase.from("teams").update({ logo_url: url }).eq("id", team.id);
     }
     setEditingId(null);
