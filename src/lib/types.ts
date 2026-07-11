@@ -24,3 +24,20 @@ export type Match = {
   status: string | null;
   created_at: string;
 };
+
+export type MatchStat = {
+  id: number;
+  match_id: number | null;
+  player_id: number | null;
+  passes: number | null;
+  successful_passes: number | null;
+  shots: number | null;
+  shots_on_target: number | null;
+  dribbles: number | null;
+  tackles: number | null;
+  fouls: number | null;
+  cards: string | null;
+  assists: number | null;
+  goals: number | null;
+  created_at: string;
+};

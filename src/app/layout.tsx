@@ -30,7 +30,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <nav className="border-b border-black/10 dark:border-white/10">
-          <div className="mx-auto max-w-4xl flex gap-6 px-6 py-4 text-sm font-medium">
+          <div className="mx-auto max-w-5xl flex gap-6 px-6 py-4 text-sm font-medium">
             <Link href="/" className="hover:underline">
               VAT
             </Link>
@@ -43,9 +43,12 @@ export default function RootLayout({
             <Link href="/matches" className="hover:underline">
               Matches
             </Link>
+            <Link href="/dashboard" className="hover:underline">
+              Dashboard
+            </Link>
           </div>
         </nav>
-        <main className="flex-1 mx-auto w-full max-w-4xl px-6 py-8">
+        <main className="flex-1 mx-auto w-full max-w-5xl px-6 py-8">
           {children}
         </main>
       </body>
