@@ -73,3 +73,21 @@ export type MatchAttendance = {
   responded_at: string | null;
   created_at: string;
 };
+
+export type TacticsContext = "starting" | "set_piece_attack" | "set_piece_defense";
+
+export type MatchFormation = {
+  match_id: number;
+  formation: string;
+  updated_at: string;
+};
+
+export type MatchTacticPosition = {
+  id: number;
+  match_id: number;
+  context: TacticsContext;
+  player_id: number;
+  pos_x: number;
+  pos_y: number;
+  created_at: string;
+};

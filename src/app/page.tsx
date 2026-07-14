@@ -5,6 +5,7 @@ const SECTIONS = [
   { href: "/teams", title: "Takımlar", description: "Takımlarını oluştur ve yönet." },
   { href: "/players", title: "Oyuncular", description: "Kadro ve forma numaralarını takip et." },
   { href: "/matches", title: "Maçlar", description: "Fikstür ve maç sonuçlarını kaydet." },
+  { href: "/taktik", title: "Taktik", description: "İlk 11, diziliş ve duran top pozisyonlarını belirle." },
   { href: "/live", title: "Canlı Takip", description: "Sahada gerçek zamanlı olay girişi yap." },
   { href: "/analysis", title: "Video Analiz", description: "Maç videosu üzerinden olay etiketle." },
   { href: "/dashboard", title: "İstatistikler", description: "Gol krallığı, asist ve pas isabeti." },

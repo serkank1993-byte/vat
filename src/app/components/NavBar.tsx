@@ -11,6 +11,7 @@ const LINKS = [
   { href: "/players", label: "Oyuncular" },
   { href: "/matches", label: "Maçlar" },
   { href: "/katilim", label: "Katılım" },
+  { href: "/taktik", label: "Taktik" },
   { href: "/live", label: "Canlı Takip" },
   { href: "/analysis", label: "Video Analiz" },
   { href: "/dashboard", label: "İstatistikler" },
