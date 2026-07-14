@@ -41,6 +41,8 @@ export default function PlayersPage() {
   const [teamId, setTeamId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [positionFilter, setPositionFilter] = useState("");
   const [inviteLinks, setInviteLinks] = useState<Record<number, string>>({});
   const [copiedId, setCopiedId] = useState<number | null>(null);
 
@@ -221,6 +223,16 @@ export default function PlayersPage() {
     loadData();
   }
 
+  const positions = Array.from(
+    new Set(players.map((p) => p.position).filter((p): p is string => Boolean(p && p.trim()))),
+  ).sort((a, b) => a.localeCompare(b, "tr"));
+
+  const filteredPlayers = players.filter((p) => {
+    const matchesQuery = !searchQuery.trim() || p.name.toLowerCase().includes(searchQuery.trim().toLowerCase());
+    const matchesPosition = !positionFilter || p.position === positionFilter;
+    return matchesQuery && matchesPosition;
+  });
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeading icon={UserIcon} title="Oyuncular" />
@@ -258,14 +270,35 @@ export default function PlayersPage() {
         </button>
       </form>
 
+      {players.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Ad soyad ara..."
+            className={`flex-1 min-w-[200px] ${input}`}
+          />
+          <select value={positionFilter} onChange={(e) => setPositionFilter(e.target.value)} className={input}>
+            <option value="">Tüm mevkiler</option>
+            {positions.map((pos) => (
+              <option key={pos} value={pos}>
+                {pos}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       {loading ? (
         <p className="text-foreground/60">Yükleniyor...</p>
       ) : players.length === 0 ? (
         <EmptyState icon={UserIcon} message="Henüz oyuncu yok." />
+      ) : filteredPlayers.length === 0 ? (
+        <EmptyState icon={UserIcon} message="Arama kriterlerine uygun oyuncu bulunamadı." />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {players.map((player) => (
+          {filteredPlayers.map((player) => (
             <div key={player.id} className={`${card} flex flex-col gap-2`}>
               <div className="flex items-center justify-between">
                 <span>
