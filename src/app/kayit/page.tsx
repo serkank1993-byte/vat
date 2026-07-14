@@ -3,7 +3,9 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { card, input, pageTitle, primaryButton } from "@/lib/ui";
+import { card, input, primaryButton } from "@/lib/ui";
+import PageHeading from "@/app/components/PageHeading";
+import { UserIcon } from "@/lib/icons";
 
 const PENDING_TOKEN_KEY = "vat_pending_invite_token";
 
@@ -82,7 +84,7 @@ function SignupForm() {
 
   return (
     <div className="flex flex-col gap-6 max-w-sm">
-      <h1 className={pageTitle}>Hesap Oluştur</h1>
+      <PageHeading icon={UserIcon} title="Hesap Oluştur" />
       {player && (
         <p className="text-sm text-foreground/70">
           <span className="font-medium">

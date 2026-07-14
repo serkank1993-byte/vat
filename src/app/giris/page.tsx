@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { card, input, pageTitle, primaryButton } from "@/lib/ui";
+import { card, input, primaryButton } from "@/lib/ui";
+import PageHeading from "@/app/components/PageHeading";
+import { ArrowRightCircleIcon } from "@/lib/icons";
 
 const PENDING_BOOTSTRAP_KEY = "vat_pending_admin_bootstrap";
 
@@ -37,7 +39,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex flex-col gap-6 max-w-sm">
-      <h1 className={pageTitle}>Giriş Yap</h1>
+      <PageHeading icon={ArrowRightCircleIcon} title="Giriş Yap" />
       <form onSubmit={handleSubmit} className={`${card} flex flex-col gap-3`}>
         {error && <p className="text-red-600 text-sm">{error}</p>}
         <label className="flex flex-col gap-1 text-sm">

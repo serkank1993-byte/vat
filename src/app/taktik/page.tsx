@@ -5,8 +5,11 @@ import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/useSession";
 import type { Match, MatchTacticPosition, Player, TacticsContext, Team } from "@/lib/types";
 import { DEFAULT_FORMATION, FORMATIONS, FORMATION_NAMES } from "@/lib/formations";
-import { card, chip, dangerLink, input, pageTitle, primaryButton, sectionTitle } from "@/lib/ui";
+import { card, chip, dangerLink, input, primaryButton, sectionTitle } from "@/lib/ui";
 import PitchDiagram from "@/app/components/PitchDiagram";
+import PageHeading from "@/app/components/PageHeading";
+import EmptyState from "@/app/components/EmptyState";
+import { CalendarIcon, TacticsBoardIcon } from "@/lib/icons";
 
 const TABS: { key: TacticsContext; label: string }[] = [
   { key: "starting", label: "İlk 11 & Diziliş" },
@@ -249,7 +252,7 @@ export default function TacticsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className={pageTitle}>Taktik</h1>
+      <PageHeading icon={TacticsBoardIcon} title="Taktik" />
 
       {error && <p className="text-red-600 text-sm">{error}</p>}
 
@@ -265,7 +268,7 @@ export default function TacticsPage() {
       {loading ? (
         <p className="text-foreground/60">Yükleniyor...</p>
       ) : !matchId ? (
-        <p className="text-foreground/60">Taktik hazırlamak için önce bir maç seçin.</p>
+        <EmptyState icon={CalendarIcon} message="Taktik hazırlamak için önce bir maç seçin." />
       ) : matchLoading ? (
         <p className="text-foreground/60">Yükleniyor...</p>
       ) : (

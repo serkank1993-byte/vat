@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Player, Team } from "@/lib/types";
-import { card, dangerLink, input, pageTitle, primaryButton, secondaryButton } from "@/lib/ui";
+import { card, dangerLink, input, primaryButton, secondaryButton } from "@/lib/ui";
 import { uploadImage } from "@/lib/storage";
 import PlayerCard from "@/app/components/PlayerCard";
+import PageHeading from "@/app/components/PageHeading";
+import EmptyState from "@/app/components/EmptyState";
+import { UserIcon } from "@/lib/icons";
 
 function fileToBase64(file: File): Promise<{ base64: string; mimeType: string }> {
   return new Promise((resolve, reject) => {
@@ -220,7 +223,7 @@ export default function PlayersPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className={pageTitle}>Oyuncular</h1>
+      <PageHeading icon={UserIcon} title="Oyuncular" />
 
       <form onSubmit={handleAdd} className={`${card} flex flex-wrap gap-2`}>
         <input
@@ -259,7 +262,7 @@ export default function PlayersPage() {
       {loading ? (
         <p className="text-foreground/60">Yükleniyor...</p>
       ) : players.length === 0 ? (
-        <p className="text-foreground/60">Henüz oyuncu yok.</p>
+        <EmptyState icon={UserIcon} message="Henüz oyuncu yok." />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {players.map((player) => (

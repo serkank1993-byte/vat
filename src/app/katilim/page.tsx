@@ -5,7 +5,10 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/useSession";
 import type { AttendanceStatus, Match, MatchAttendance, Player, Team } from "@/lib/types";
-import { card, chip, input, pageTitle, sectionTitle } from "@/lib/ui";
+import { card, chip, input, sectionTitle } from "@/lib/ui";
+import PageHeading from "@/app/components/PageHeading";
+import EmptyState from "@/app/components/EmptyState";
+import { CheckCircleIcon, MinusCircleIcon, UserIcon, XCircleIcon } from "@/lib/icons";
 
 const STATUS_OPTIONS: { value: AttendanceStatus; label: string }[] = [
   { value: "geliyor", label: "Geliyorum" },
@@ -146,7 +149,7 @@ export default function AttendancePage() {
   if (!session) {
     return (
       <div className="flex flex-col gap-4">
-        <h1 className={pageTitle}>Katılım</h1>
+        <PageHeading icon={CheckCircleIcon} title="Katılım" />
         <p className="text-foreground/70">
           Bu sayfayı görmek için giriş yapmalısın.{" "}
           <Link href="/giris" className="text-accent hover:underline">
@@ -160,7 +163,7 @@ export default function AttendancePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className={pageTitle}>Katılım</h1>
+      <PageHeading icon={CheckCircleIcon} title="Katılım" />
       {error && <p className="text-red-600 text-sm">{error}</p>}
 
       <select value={matchId} onChange={(e) => handleSelectMatch(e.target.value)} className={`self-start ${input}`}>
@@ -174,16 +177,40 @@ export default function AttendancePage() {
 
       {selectedMatch && (
         <>
-          <div className={`${card} flex gap-6 text-sm`}>
-            <span className="text-accent font-semibold">{counts.geliyor} Geliyor</span>
-            <span className="text-red-600 font-semibold">{counts.gelmiyor} Gelmiyor</span>
-            <span className="text-foreground/60 font-semibold">{counts.belirsiz} Belirsiz</span>
+          <div className="grid grid-cols-3 gap-3">
+            <div className={`${card} flex items-center gap-3`}>
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
+                <CheckCircleIcon className="h-4 w-4" />
+              </span>
+              <div>
+                <div className="text-xl font-semibold leading-none">{counts.geliyor}</div>
+                <div className="text-xs text-foreground/50 mt-1">Geliyor</div>
+              </div>
+            </div>
+            <div className={`${card} flex items-center gap-3`}>
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-500/15 text-red-600">
+                <XCircleIcon className="h-4 w-4" />
+              </span>
+              <div>
+                <div className="text-xl font-semibold leading-none">{counts.gelmiyor}</div>
+                <div className="text-xs text-foreground/50 mt-1">Gelmiyor</div>
+              </div>
+            </div>
+            <div className={`${card} flex items-center gap-3`}>
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-foreground/10 text-foreground/60">
+                <MinusCircleIcon className="h-4 w-4" />
+              </span>
+              <div>
+                <div className="text-xl font-semibold leading-none">{counts.belirsiz}</div>
+                <div className="text-xs text-foreground/50 mt-1">Belirsiz</div>
+              </div>
+            </div>
           </div>
 
           <div className="flex flex-col gap-2">
             <h2 className={sectionTitle}>Kadro</h2>
             {rosterForSelectedMatch.length === 0 ? (
-              <p className="text-foreground/60 text-sm">Bu maçın takımı için oyuncu bulunamadı.</p>
+              <EmptyState icon={UserIcon} message="Bu maçın takımı için oyuncu bulunamadı." />
             ) : (
               <ul className="flex flex-col gap-2">
                 {rosterForSelectedMatch.map((p) => {

@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Team } from "@/lib/types";
-import { card, dangerLink, input, pageTitle, primaryButton, secondaryButton } from "@/lib/ui";
+import { card, dangerLink, input, primaryButton, secondaryButton } from "@/lib/ui";
 import TeamRecordsPanel from "@/app/components/TeamRecordsPanel";
 import { uploadImage } from "@/lib/storage";
+import PageHeading from "@/app/components/PageHeading";
+import EmptyState from "@/app/components/EmptyState";
+import { ShieldIcon } from "@/lib/icons";
 
 export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
@@ -120,7 +123,7 @@ export default function TeamsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className={pageTitle}>Takımlar</h1>
+      <PageHeading icon={ShieldIcon} title="Takımlar" />
 
       <form onSubmit={handleAdd} className={`${card} flex flex-col gap-3 max-w-xl`}>
         <input
@@ -187,7 +190,7 @@ export default function TeamsPage() {
       {loading ? (
         <p className="text-foreground/60">Yükleniyor...</p>
       ) : teams.length === 0 ? (
-        <p className="text-foreground/60">Henüz takım yok.</p>
+        <EmptyState icon={ShieldIcon} message="Henüz takım yok." />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {teams.map((team) => (

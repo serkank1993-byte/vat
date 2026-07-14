@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Match, MatchEvent, Player, Team } from "@/lib/types";
-import { card, input, pageTitle, sectionTitle } from "@/lib/ui";
+import { card, input, sectionTitle } from "@/lib/ui";
+import PageHeading from "@/app/components/PageHeading";
+import { BarChartIcon } from "@/lib/icons";
 import StatTile from "@/app/components/StatTile";
 
 export default function DashboardPage() {
@@ -194,7 +196,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <h1 className={pageTitle}>İstatistikler</h1>
+      <PageHeading icon={BarChartIcon} title="İstatistikler" />
       {error && <p className="text-red-600 text-sm">{error}</p>}
       {loading && <p className="text-foreground/60">Yükleniyor...</p>}
       <p className="text-sm text-foreground/60">

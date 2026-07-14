@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Match, MatchEvent, Player, Team } from "@/lib/types";
 import { EVENT_TYPES, ZONES, formatClock } from "@/lib/match-tracking";
-import { card, chip, dangerLink, input, pageTitle, primaryButton, secondaryButton, sectionTitle } from "@/lib/ui";
+import { card, chip, dangerLink, input, primaryButton, secondaryButton, sectionTitle } from "@/lib/ui";
+import PageHeading from "@/app/components/PageHeading";
+import { ActivityIcon } from "@/lib/icons";
 
 export default function LivePage() {
   const [teams, setTeams] = useState<Team[]>([]);
@@ -163,7 +165,7 @@ export default function LivePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className={pageTitle}>Canlı Maç Takibi</h1>
+      <PageHeading icon={ActivityIcon} title="Canlı Maç Takibi" />
       {error && <p className="text-red-600 text-sm">{error}</p>}
       {loading && <p className="text-foreground/60">Yükleniyor...</p>}
 

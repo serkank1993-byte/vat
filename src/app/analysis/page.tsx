@@ -5,7 +5,9 @@ import { supabase } from "@/lib/supabase";
 import type { Match, MatchEvent, Player, Team } from "@/lib/types";
 import { EVENT_TYPES, ZONES } from "@/lib/match-tracking";
 import { extractYouTubeId, loadYouTubeIframeApi, type YTPlayer } from "@/lib/youtube";
-import { card, chip, dangerLink, input, pageTitle, primaryButton, secondaryButton, sectionTitle } from "@/lib/ui";
+import { card, chip, dangerLink, input, primaryButton, secondaryButton, sectionTitle } from "@/lib/ui";
+import PageHeading from "@/app/components/PageHeading";
+import { PlayCircleIcon } from "@/lib/icons";
 
 const PLAYER_ELEMENT_ID = "vat-youtube-player";
 
@@ -204,7 +206,7 @@ export default function AnalysisPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className={pageTitle}>Video Analiz</h1>
+      <PageHeading icon={PlayCircleIcon} title="Video Analiz" />
       {error && <p className="text-red-600 text-sm">{error}</p>}
       {loading && <p className="text-foreground/60">Yükleniyor...</p>}
 

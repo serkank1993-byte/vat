@@ -5,8 +5,10 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/useSession";
 import type { MatchAttendance, MatchEvent, Player } from "@/lib/types";
-import { card, dangerLink, input, pageTitle, primaryButton, secondaryButton, sectionTitle } from "@/lib/ui";
+import { card, dangerLink, input, primaryButton, secondaryButton, sectionTitle } from "@/lib/ui";
 import StatTile from "@/app/components/StatTile";
+import PageHeading from "@/app/components/PageHeading";
+import { UserCircleIcon } from "@/lib/icons";
 
 const PENDING_TOKEN_KEY = "vat_pending_invite_token";
 
@@ -113,7 +115,7 @@ export default function AccountPage() {
   if (!session) {
     return (
       <div className="flex flex-col gap-4">
-        <h1 className={pageTitle}>Hesabım</h1>
+        <PageHeading icon={UserCircleIcon} title="Hesabım" />
         <p className="text-foreground/70">
           Bu sayfayı görmek için giriş yapmalısın.{" "}
           <Link href="/giris" className="text-accent hover:underline">
@@ -128,7 +130,7 @@ export default function AccountPage() {
   if (!player) {
     return (
       <div className="flex flex-col gap-4">
-        <h1 className={pageTitle}>Hesabım</h1>
+        <PageHeading icon={UserCircleIcon} title="Hesabım" />
         {error && <p className="text-red-600 text-sm">{error}</p>}
         {isAdmin ? (
           <p className="text-foreground/70">
@@ -152,7 +154,7 @@ export default function AccountPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <h1 className={pageTitle}>Hesabım</h1>
+      <PageHeading icon={UserCircleIcon} title="Hesabım" />
       {error && <p className="text-red-600 text-sm">{error}</p>}
 
       <section className="flex flex-col gap-3">

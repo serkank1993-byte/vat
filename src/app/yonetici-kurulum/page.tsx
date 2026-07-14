@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { card, input, pageTitle, primaryButton } from "@/lib/ui";
+import { card, input, primaryButton } from "@/lib/ui";
+import PageHeading from "@/app/components/PageHeading";
+import { ShieldIcon } from "@/lib/icons";
 
 const PENDING_BOOTSTRAP_KEY = "vat_pending_admin_bootstrap";
 
@@ -54,7 +56,7 @@ export default function AdminSetupPage() {
   if (alreadySetUp) {
     return (
       <div className="flex flex-col gap-4">
-        <h1 className={pageTitle}>Yönetici Kurulumu</h1>
+        <PageHeading icon={ShieldIcon} title="Yönetici Kurulumu" />
         <p className="text-foreground/70">
           Zaten bir yönetici hesabı var. Giriş yapmak için{" "}
           <a href="/giris" className="text-accent hover:underline">
@@ -79,7 +81,7 @@ export default function AdminSetupPage() {
 
   return (
     <div className="flex flex-col gap-6 max-w-sm">
-      <h1 className={pageTitle}>Yönetici Kurulumu</h1>
+      <PageHeading icon={ShieldIcon} title="Yönetici Kurulumu" />
       <p className="text-sm text-foreground/70">
         Bu, uygulamanın ilk ve tek yönetici hesabını oluşturur. Bu sayfa, bir yönetici hesabı
         oluşturulduktan sonra tekrar kullanılamaz.

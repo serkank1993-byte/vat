@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Match, Team } from "@/lib/types";
-import { card, dangerLink, input, pageTitle, primaryButton } from "@/lib/ui";
+import { card, dangerLink, input, primaryButton } from "@/lib/ui";
+import PageHeading from "@/app/components/PageHeading";
+import EmptyState from "@/app/components/EmptyState";
+import { CalendarIcon } from "@/lib/icons";
 
 const STATUS_LABELS: Record<string, string> = {
   scheduled: "Planlandı",
@@ -69,7 +72,7 @@ export default function MatchesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className={pageTitle}>Maçlar</h1>
+      <PageHeading icon={CalendarIcon} title="Maçlar" />
 
       <form onSubmit={handleAdd} className={`${card} flex flex-wrap gap-2`}>
         <select value={teamId} onChange={(e) => setTeamId(e.target.value)} className={input}>
@@ -107,26 +110,37 @@ export default function MatchesPage() {
       {loading ? (
         <p className="text-foreground/60">Yükleniyor...</p>
       ) : matches.length === 0 ? (
-        <p className="text-foreground/60">Henüz maç yok.</p>
+        <EmptyState icon={CalendarIcon} message="Henüz maç yok." />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {matches.map((match) => (
-            <div key={match.id} className={`${card} flex items-center justify-between`}>
-              <span>
-                <span className="font-medium">
-                  {teamName(match.team_id)} - {match.opponent_name}
-                </span>{" "}
-                <span className="text-foreground/50">
-                  {new Date(match.match_date).toLocaleString("tr-TR")}
-                  {match.location ? ` · ${match.location}` : ""} ·{" "}
-                  {STATUS_LABELS[match.status ?? "scheduled"] ?? match.status}
-                </span>
-              </span>
-              <button onClick={() => handleDelete(match.id)} className={dangerLink}>
-                Sil
-              </button>
-            </div>
-          ))}
+          {matches.map((match) => {
+            const isCompleted = (match.status ?? "scheduled") === "completed" || match.status === "finished";
+            return (
+              <div key={match.id} className={`${card} flex items-center justify-between gap-3`}>
+                <div className="flex flex-col gap-1.5">
+                  <span className="font-medium">
+                    {teamName(match.team_id)} - {match.opponent_name}
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-foreground/50">
+                    <span>
+                      {new Date(match.match_date).toLocaleString("tr-TR")}
+                      {match.location ? ` · ${match.location}` : ""}
+                    </span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        isCompleted ? "bg-accent/15 text-accent" : "bg-foreground/10 text-foreground/60"
+                      }`}
+                    >
+                      {STATUS_LABELS[match.status ?? "scheduled"] ?? match.status}
+                    </span>
+                  </div>
+                </div>
+                <button onClick={() => handleDelete(match.id)} className={dangerLink}>
+                  Sil
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
