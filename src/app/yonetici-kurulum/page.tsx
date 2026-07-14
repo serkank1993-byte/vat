@@ -48,6 +48,9 @@ export default function AdminSetupPage() {
       setSubmitting(false);
       if (bootstrapError) setError(bootstrapError.message);
       else router.push("/teams");
+    } else if (data.user && data.user.identities && data.user.identities.length === 0) {
+      setError("Bu e-posta adresiyle zaten bir hesap var. Giriş yapmayı deneyin.");
+      setSubmitting(false);
     } else {
       localStorage.setItem(PENDING_BOOTSTRAP_KEY, "1");
       setSubmitting(false);

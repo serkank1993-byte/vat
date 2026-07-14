@@ -65,6 +65,9 @@ function SignupForm() {
       setSubmitting(false);
       if (claimError) setError(claimError.message);
       else router.push("/hesabim");
+    } else if (data.user && data.user.identities && data.user.identities.length === 0) {
+      setError("Bu e-posta adresiyle zaten bir hesap var. Giriş yapmayı deneyin.");
+      setSubmitting(false);
     } else {
       localStorage.setItem(PENDING_TOKEN_KEY, token);
       setSubmitting(false);
