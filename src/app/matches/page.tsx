@@ -106,7 +106,7 @@ export default function MatchesPage() {
         </button>
       </form>
 
-      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       {loading ? (
         <p className="text-foreground/60">Yükleniyor...</p>
       ) : matches.length === 0 ? (

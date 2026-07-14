@@ -69,7 +69,7 @@ function SignupForm() {
   }
 
   if (loading) return <p className="text-foreground/60">Yükleniyor...</p>;
-  if (lookupError) return <p className="text-red-600 text-sm">{lookupError}</p>;
+  if (lookupError) return <p className="text-sm text-red-600 dark:text-red-400">{lookupError}</p>;
 
   if (awaitingConfirmation) {
     return (
@@ -94,7 +94,7 @@ function SignupForm() {
         </p>
       )}
       <form onSubmit={handleSubmit} className={`${card} flex flex-col gap-3`}>
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <label className="flex flex-col gap-1 text-sm">
           E-posta
           <input

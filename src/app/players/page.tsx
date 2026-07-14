@@ -258,7 +258,7 @@ export default function PlayersPage() {
         </button>
       </form>
 
-      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       {loading ? (
         <p className="text-foreground/60">Yükleniyor...</p>
       ) : players.length === 0 ? (
@@ -383,7 +383,7 @@ export default function PlayersPage() {
                         {generatingAi ? "Kart Oluşturuluyor..." : "Yapay Zeka ile Profesyonel Kart Oluştur"}
                       </button>
                     </div>
-                    {error && <p className="text-red-600 text-sm">{error}</p>}
+                    {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
                   </div>
                 </div>
               )}

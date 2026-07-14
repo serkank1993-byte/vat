@@ -87,7 +87,7 @@ export default function AdminSetupPage() {
         oluşturulduktan sonra tekrar kullanılamaz.
       </p>
       <form onSubmit={handleSubmit} className={`${card} flex flex-col gap-3`}>
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <label className="flex flex-col gap-1 text-sm">
           E-posta
           <input

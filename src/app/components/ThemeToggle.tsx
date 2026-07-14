@@ -24,7 +24,7 @@ export default function ThemeToggle() {
       onClick={toggle}
       aria-label={theme === "dark" ? "Açık temaya geç" : "Koyu temaya geç"}
       title={theme === "dark" ? "Açık Tema" : "Koyu Tema"}
-      className="rounded-md px-2.5 py-1.5 text-base leading-none text-foreground/70 hover:bg-foreground/5 hover:text-foreground transition"
+      className="rounded-md px-2.5 py-1.5 text-base leading-none text-foreground/70 hover:bg-foreground/5 hover:text-foreground transition-colors duration-300"
     >
       {theme === "dark" ? "☀️" : "🌙"}
     </button>

@@ -166,7 +166,7 @@ export default function LivePage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeading icon={ActivityIcon} title="Canlı Maç Takibi" />
-      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       {loading && <p className="text-foreground/60">Yükleniyor...</p>}
 
       <select

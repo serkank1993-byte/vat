@@ -77,7 +77,7 @@ export default function TeamRecordsPanel({ teamId }: { teamId: number }) {
 
   return (
     <div className="flex flex-col gap-4 border-t border-border pt-4 mt-2">
-      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       {loading ? (
         <p className="text-foreground/60 text-sm">Yükleniyor...</p>
       ) : (

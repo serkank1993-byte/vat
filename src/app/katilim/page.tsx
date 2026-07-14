@@ -164,7 +164,7 @@ export default function AttendancePage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeading icon={CheckCircleIcon} title="Katılım" />
-      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <select value={matchId} onChange={(e) => handleSelectMatch(e.target.value)} className={`self-start ${input}`}>
         <option value="">Maç seç</option>
@@ -188,7 +188,7 @@ export default function AttendancePage() {
               </div>
             </div>
             <div className={`${card} flex items-center gap-3`}>
-              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-500/15 text-red-600">
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-500/15 text-red-600 dark:text-red-400">
                 <XCircleIcon className="h-4 w-4" />
               </span>
               <div>
@@ -239,7 +239,7 @@ export default function AttendancePage() {
                             status === "geliyor"
                               ? "text-accent"
                               : status === "gelmiyor"
-                                ? "text-red-600"
+                                ? "text-red-600 dark:text-red-400"
                                 : "text-foreground/50"
                           }`}
                         >

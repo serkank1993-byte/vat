@@ -254,7 +254,7 @@ export default function TacticsPage() {
     <div className="flex flex-col gap-6">
       <PageHeading icon={TacticsBoardIcon} title="Taktik" />
 
-      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <select value={matchId} onChange={(e) => setMatchId(e.target.value)} className={`self-start ${input}`}>
         <option value="">Bir maç seçin</option>

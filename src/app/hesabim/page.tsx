@@ -131,7 +131,7 @@ export default function AccountPage() {
     return (
       <div className="flex flex-col gap-4">
         <PageHeading icon={UserCircleIcon} title="Hesabım" />
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         {isAdmin ? (
           <p className="text-foreground/70">
             Yönetici olarak giriş yaptın. Bu sayfa oyuncular içindir —{" "}
@@ -155,7 +155,7 @@ export default function AccountPage() {
   return (
     <div className="flex flex-col gap-8">
       <PageHeading icon={UserCircleIcon} title="Hesabım" />
-      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <section className="flex flex-col gap-3">
         <h2 className={sectionTitle}>Profil</h2>

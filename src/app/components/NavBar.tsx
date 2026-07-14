@@ -34,10 +34,13 @@ export default function NavBar() {
   const { session } = useSession();
 
   return (
-    <nav className="sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur">
+    <nav className="sticky top-0 z-10 border-b border-border bg-surface/80 backdrop-blur transition-colors duration-300">
       <div className="mx-auto max-w-7xl flex items-center gap-1 px-6 py-3 text-sm overflow-x-auto">
-        <Link href="/" className="mr-4 flex items-center gap-2 font-bold text-accent shrink-0">
-          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-accent-foreground">
+        <Link
+          href="/"
+          className="mr-4 flex items-center gap-2 font-bold text-accent shrink-0 transition-colors duration-300"
+        >
+          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-accent-foreground transition-colors duration-300">
             <BallIcon className="h-4 w-4" />
           </span>
           SahaIçi
@@ -49,7 +52,7 @@ export default function NavBar() {
             <Link
               key={link.href}
               href={link.href}
-              className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition ${
+              className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors duration-300 ${
                 active
                   ? "bg-accent text-accent-foreground shadow-sm"
                   : "text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
@@ -66,7 +69,7 @@ export default function NavBar() {
             <>
               <Link
                 href="/hesabim"
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition ${
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors duration-300 ${
                   pathname === "/hesabim"
                     ? "bg-accent text-accent-foreground shadow-sm"
                     : "text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
@@ -77,7 +80,7 @@ export default function NavBar() {
               </Link>
               <button
                 onClick={() => supabase.auth.signOut()}
-                className="rounded-md px-3 py-1.5 font-medium text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+                className="rounded-md px-3 py-1.5 font-medium text-foreground/70 hover:bg-foreground/5 hover:text-foreground transition-colors duration-300"
               >
                 Çıkış
               </button>
@@ -85,7 +88,7 @@ export default function NavBar() {
           ) : (
             <Link
               href="/giris"
-              className={`rounded-md px-3 py-1.5 font-medium transition ${
+              className={`rounded-md px-3 py-1.5 font-medium transition-colors duration-300 ${
                 pathname === "/giris"
                   ? "bg-accent text-accent-foreground shadow-sm"
                   : "text-foreground/70 hover:bg-foreground/5 hover:text-foreground"

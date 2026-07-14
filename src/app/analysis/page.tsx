@@ -207,7 +207,7 @@ export default function AnalysisPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeading icon={PlayCircleIcon} title="Video Analiz" />
-      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       {loading && <p className="text-foreground/60">Yükleniyor...</p>}
 
       <select
@@ -238,7 +238,7 @@ export default function AnalysisPage() {
       )}
 
       {selectedMatch && selectedMatch.video_url && !videoId && (
-        <p className="text-red-600 text-sm">Kayıtlı video linki geçerli bir YouTube URL&apos;sine benzemiyor.</p>
+        <p className="text-sm text-red-600 dark:text-red-400">Kayıtlı video linki geçerli bir YouTube URL&apos;sine benzemiyor.</p>
       )}
 
       {selectedMatch && videoId && (

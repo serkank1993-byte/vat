@@ -197,7 +197,7 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-8">
       <PageHeading icon={BarChartIcon} title="İstatistikler" />
-      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       {loading && <p className="text-foreground/60">Yükleniyor...</p>}
       <p className="text-sm text-foreground/60">
         Bu sayfa, Canlı Takip ve Video Analiz sayfalarında kaydedilen olaylardan otomatik hesaplanır.
