@@ -49,17 +49,41 @@ export default function TacticsPage() {
 
   useEffect(() => {
     function handleFullscreenChange() {
-      setIsFullscreen(document.fullscreenElement === panelRef.current);
+      if (!document.fullscreenElement) setIsFullscreen(false);
     }
     document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+    };
   }, []);
 
   function toggleFullscreen() {
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-    } else {
-      panelRef.current?.requestFullscreen();
+    const next = !isFullscreen;
+    setIsFullscreen(next);
+
+    // Native Fullscreen API is a nice-to-have (hides browser chrome) but is
+    // unreliable/unsupported on many phones & tablets (notably iOS Safari for
+    // non-video elements). The maximized layout above works regardless, so we
+    // only best-effort call it and never let a rejection/missing API break the toggle.
+    const el = panelRef.current as
+      | (HTMLDivElement & {
+          webkitRequestFullscreen?: () => Promise<void> | void;
+        })
+      | null;
+    try {
+      if (next) {
+        const request = el?.requestFullscreen?.bind(el) ?? el?.webkitRequestFullscreen?.bind(el);
+        const result = request?.();
+        if (result instanceof Promise) result.catch(() => {});
+      } else if (document.fullscreenElement) {
+        const exit = document.exitFullscreen?.bind(document);
+        const result = exit?.();
+        if (result instanceof Promise) result.catch(() => {});
+      }
+    } catch {
+      // ignore — CSS-driven maximized layout already applied above
     }
   }
 
