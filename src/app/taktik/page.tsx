@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/useSession";
 import type { Match, MatchTacticPosition, Player, TacticsContext, Team } from "@/lib/types";
 import { DEFAULT_FORMATION, FORMATIONS, FORMATION_NAMES } from "@/lib/formations";
-import { card, chip, dangerLink, input, primaryButton, sectionTitle } from "@/lib/ui";
+import { card, chip, dangerLink, input, primaryButton, secondaryButton, sectionTitle } from "@/lib/ui";
 import PitchDiagram from "@/app/components/PitchDiagram";
 import PageHeading from "@/app/components/PageHeading";
 import EmptyState from "@/app/components/EmptyState";
-import { CalendarIcon, TacticsBoardIcon } from "@/lib/icons";
+import { CalendarIcon, MaximizeIcon, MinimizeIcon, TacticsBoardIcon } from "@/lib/icons";
 
 const TABS: { key: TacticsContext; label: string }[] = [
   { key: "starting", label: "İlk 11 & Diziliş" },
@@ -44,6 +44,24 @@ export default function TacticsPage() {
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    function handleFullscreenChange() {
+      setIsFullscreen(document.fullscreenElement === panelRef.current);
+    }
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  function toggleFullscreen() {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      panelRef.current?.requestFullscreen();
+    }
+  }
 
   async function loadBase() {
     setLoading(true);
@@ -309,13 +327,24 @@ export default function TacticsPage() {
       ) : matchLoading ? (
         <p className="text-foreground/60">Yükleniyor...</p>
       ) : (
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap gap-2">
-            {TABS.map((t) => (
-              <button key={t.key} onClick={() => setTab(t.key)} className={chip(tab === t.key)}>
-                {t.label}
-              </button>
-            ))}
+        <div
+          ref={panelRef}
+          className={`flex flex-col gap-4 ${
+            isFullscreen ? "fixed inset-0 z-50 overflow-y-auto bg-background p-4 sm:p-6" : ""
+          }`}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-2">
+              {TABS.map((t) => (
+                <button key={t.key} onClick={() => setTab(t.key)} className={chip(tab === t.key)}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <button onClick={toggleFullscreen} className={secondaryButton}>
+              {isFullscreen ? <MinimizeIcon className="h-4 w-4" /> : <MaximizeIcon className="h-4 w-4" />}
+              {isFullscreen ? "Küçült" : "Tam Ekran"}
+            </button>
           </div>
 
           {!canEdit && (
@@ -369,7 +398,7 @@ export default function TacticsPage() {
                   Bir oyuncuyu sahada sürükleyerek tam konumunu ayarlayabilirsiniz.
                 </p>
               </div>
-              <div className="w-full max-w-xs mx-auto lg:mx-0">
+              <div className={`w-full mx-auto lg:mx-0 ${isFullscreen ? "max-w-2xl" : "max-w-md"}`}>
                 <PitchDiagram>
                   {startingSlots.map((slot, i) => {
                     const player = slot.playerId != null ? roster.find((p) => p.id === slot.playerId) : null;
@@ -438,23 +467,37 @@ export default function TacticsPage() {
                   })}
                 </div>
               </div>
-              <div className="w-full max-w-xs mx-auto lg:mx-0">
+              <div className={`w-full mx-auto lg:mx-0 ${isFullscreen ? "max-w-2xl" : "max-w-md"}`}>
                 <PitchDiagram onClick={canEdit ? handlePitchClick : undefined}>
-                  {setPieceMarkers[tab as "set_piece_attack" | "set_piece_defense"].map((m) => (
-                    <button
-                      key={m.playerId}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (canEdit) setSelectedPlayerId(m.playerId);
-                      }}
-                      className={`absolute flex h-8 w-8 -translate-x-1/2 translate-y-1/2 items-center justify-center rounded-full border-2 text-xs font-semibold text-white transition ${
-                        selectedPlayerId === m.playerId ? "border-yellow-300 bg-accent" : "border-white/80 bg-black/50"
-                      }`}
-                      style={{ left: `${m.x}%`, bottom: `${m.y}%` }}
-                    >
-                      {roster.find((p) => p.id === m.playerId)?.jersey_number}
-                    </button>
-                  ))}
+                  {setPieceMarkers[tab as "set_piece_attack" | "set_piece_defense"].map((m) => {
+                    const player = roster.find((p) => p.id === m.playerId);
+                    return (
+                      <div
+                        key={m.playerId}
+                        className="absolute flex -translate-x-1/2 translate-y-1/2 flex-col items-center"
+                        style={{ left: `${m.x}%`, bottom: `${m.y}%` }}
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (canEdit) setSelectedPlayerId(m.playerId);
+                          }}
+                          className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-semibold text-white transition ${
+                            selectedPlayerId === m.playerId
+                              ? "border-yellow-300 bg-accent"
+                              : "border-white/80 bg-black/50"
+                          }`}
+                        >
+                          {player?.jersey_number}
+                        </button>
+                        {player && (
+                          <div className="mt-1 max-w-[72px] truncate rounded bg-black/60 px-1.5 py-0.5 text-center text-[10px] text-white">
+                            {player.name}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </PitchDiagram>
               </div>
             </div>
