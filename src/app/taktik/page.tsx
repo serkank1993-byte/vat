@@ -18,6 +18,7 @@ const TABS: { key: TacticsContext; label: string }[] = [
 ];
 
 type Marker = { playerId: number; x: number; y: number };
+type StartingSlot = { playerId: number | null; x: number; y: number };
 
 export default function TacticsPage() {
   const { session } = useSession();
@@ -33,7 +34,9 @@ export default function TacticsPage() {
   const [matchLoading, setMatchLoading] = useState(false);
   const [tab, setTab] = useState<TacticsContext>("starting");
   const [formation, setFormation] = useState(DEFAULT_FORMATION);
-  const [startingAssignments, setStartingAssignments] = useState<(number | null)[]>(Array(11).fill(null));
+  const [startingSlots, setStartingSlots] = useState<StartingSlot[]>(
+    FORMATIONS[DEFAULT_FORMATION].map((s) => ({ playerId: null, x: s.x, y: s.y })),
+  );
   const [setPieceMarkers, setSetPieceMarkers] = useState<Record<"set_piece_attack" | "set_piece_defense", Marker[]>>({
     set_piece_attack: [],
     set_piece_defense: [],
@@ -96,15 +99,17 @@ export default function TacticsPage() {
     setFormation(loadedFormation);
 
     const allTactics: MatchTacticPosition[] = tacticsRes.data ?? [];
-    const slots = FORMATIONS[loadedFormation] ?? FORMATIONS[DEFAULT_FORMATION];
-    const startingRows = allTactics.filter((r) => r.context === "starting");
-    const assignments: (number | null)[] = slots.map((slot) => {
-      const found = startingRows.find(
-        (r) => Math.abs(Number(r.pos_x) - slot.x) < 0.5 && Math.abs(Number(r.pos_y) - slot.y) < 0.5,
-      );
-      return found ? found.player_id : null;
+    const presetSlots = FORMATIONS[loadedFormation] ?? FORMATIONS[DEFAULT_FORMATION];
+    const startingRows = allTactics
+      .filter((r) => r.context === "starting")
+      .sort((a, b) => a.player_id - b.player_id);
+    const newStartingSlots: StartingSlot[] = presetSlots.map((preset, i) => {
+      const row = startingRows[i];
+      return row
+        ? { playerId: row.player_id, x: Number(row.pos_x), y: Number(row.pos_y) }
+        : { playerId: null, x: preset.x, y: preset.y };
     });
-    setStartingAssignments(assignments);
+    setStartingSlots(newStartingSlots);
 
     setSetPieceMarkers({
       set_piece_attack: allTactics
@@ -141,21 +146,53 @@ export default function TacticsPage() {
 
   function handleFormationChange(name: string) {
     setFormation(name);
+    const presetSlots = FORMATIONS[name];
+    setStartingSlots((prev) => presetSlots.map((preset, i) => ({ playerId: prev[i]?.playerId ?? null, ...preset })));
     setSaved(false);
   }
 
   function handleAssignSlot(slotIndex: number, playerId: number | null) {
-    setStartingAssignments((prev) => {
-      const next = [...prev];
+    setStartingSlots((prev) => {
+      const next = prev.map((slot) => ({ ...slot }));
       if (playerId != null) {
-        for (let i = 0; i < next.length; i++) {
-          if (next[i] === playerId) next[i] = null;
+        for (const slot of next) {
+          if (slot.playerId === playerId) slot.playerId = null;
         }
       }
-      next[slotIndex] = playerId;
+      next[slotIndex].playerId = playerId;
       return next;
     });
     setSaved(false);
+  }
+
+  function handleSlotDrag(slotIndex: number, x: number, y: number) {
+    setStartingSlots((prev) => {
+      const next = [...prev];
+      next[slotIndex] = { ...next[slotIndex], x, y };
+      return next;
+    });
+    setSaved(false);
+  }
+
+  function handleSlotPointerDown(slotIndex: number, e: React.PointerEvent<HTMLDivElement>) {
+    if (!canEdit || startingSlots[slotIndex].playerId == null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const pitchEl = (e.currentTarget as HTMLElement).closest("[data-pitch]") as HTMLElement | null;
+    if (!pitchEl) return;
+    const rect = pitchEl.getBoundingClientRect();
+
+    function onMove(moveEvent: PointerEvent) {
+      const x = ((moveEvent.clientX - rect.left) / rect.width) * 100;
+      const y = 100 - ((moveEvent.clientY - rect.top) / rect.height) * 100;
+      handleSlotDrag(slotIndex, Math.min(100, Math.max(0, x)), Math.min(100, Math.max(0, y)));
+    }
+    function onUp() {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
   }
 
   function handlePitchClick(x: number, y: number) {
@@ -199,11 +236,10 @@ export default function TacticsPage() {
         setSaving(false);
         return;
       }
-      const slots = FORMATIONS[formation];
-      const rows = startingAssignments
-        .map((playerId, i) =>
-          playerId != null
-            ? { match_id: selectedMatch.id, context: "starting", player_id: playerId, pos_x: slots[i].x, pos_y: slots[i].y }
+      const rows = startingSlots
+        .map((slot) =>
+          slot.playerId != null
+            ? { match_id: selectedMatch.id, context: "starting", player_id: slot.playerId, pos_x: slot.x, pos_y: slot.y }
             : null,
         )
         .filter((r): r is NonNullable<typeof r> => r != null);
@@ -247,8 +283,9 @@ export default function TacticsPage() {
     setSaved(true);
   }
 
-  const slots = FORMATIONS[formation] ?? FORMATIONS[DEFAULT_FORMATION];
-  const assignedPlayerIds = new Set(startingAssignments.filter((id): id is number => id != null));
+  const assignedPlayerIds = new Set(
+    startingSlots.map((s) => s.playerId).filter((id): id is number => id != null),
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -307,18 +344,18 @@ export default function TacticsPage() {
                 </label>
                 <div className={`${card} flex flex-col gap-2 max-h-[28rem] overflow-y-auto`}>
                   <h2 className={sectionTitle}>Kadro Yerleşimi</h2>
-                  {startingAssignments.map((playerId, i) => (
+                  {startingSlots.map((slot, i) => (
                     <label key={i} className="flex items-center gap-2 text-sm">
                       <span className="w-14 shrink-0 text-foreground/50">Slot {i + 1}</span>
                       <select
-                        value={playerId ?? ""}
+                        value={slot.playerId ?? ""}
                         onChange={(e) => handleAssignSlot(i, e.target.value ? Number(e.target.value) : null)}
                         disabled={!canEdit}
                         className={`flex-1 ${input}`}
                       >
                         <option value="">Boş</option>
                         {roster
-                          .filter((p) => !assignedPlayerIds.has(p.id) || p.id === playerId)
+                          .filter((p) => !assignedPlayerIds.has(p.id) || p.id === slot.playerId)
                           .map((p) => (
                             <option key={p.id} value={p.id}>
                               #{p.jersey_number} {p.name}
@@ -328,20 +365,36 @@ export default function TacticsPage() {
                     </label>
                   ))}
                 </div>
+                <p className="text-xs text-foreground/50">
+                  Bir oyuncuyu sahada sürükleyerek tam konumunu ayarlayabilirsiniz.
+                </p>
               </div>
               <div className="w-full max-w-xs mx-auto lg:mx-0">
                 <PitchDiagram>
-                  {slots.map((slot, i) => (
-                    <div
-                      key={i}
-                      className="absolute flex h-8 w-8 -translate-x-1/2 translate-y-1/2 items-center justify-center rounded-full border-2 border-white/80 bg-black/40 text-xs font-semibold text-white"
-                      style={{ left: `${slot.x}%`, bottom: `${slot.y}%` }}
-                    >
-                      {startingAssignments[i] != null
-                        ? roster.find((p) => p.id === startingAssignments[i])?.jersey_number
-                        : "+"}
-                    </div>
-                  ))}
+                  {startingSlots.map((slot, i) => {
+                    const player = slot.playerId != null ? roster.find((p) => p.id === slot.playerId) : null;
+                    return (
+                      <div
+                        key={i}
+                        onPointerDown={(e) => handleSlotPointerDown(i, e)}
+                        className="absolute flex -translate-x-1/2 translate-y-1/2 flex-col items-center touch-none"
+                        style={{ left: `${slot.x}%`, bottom: `${slot.y}%` }}
+                      >
+                        <div
+                          className={`flex h-8 w-8 items-center justify-center rounded-full border-2 border-white/80 bg-black/40 text-xs font-semibold text-white ${
+                            player && canEdit ? "cursor-grab active:cursor-grabbing" : ""
+                          }`}
+                        >
+                          {player ? player.jersey_number : "+"}
+                        </div>
+                        {player && (
+                          <div className="mt-1 max-w-[72px] truncate rounded bg-black/60 px-1.5 py-0.5 text-center text-[10px] text-white">
+                            {player.name}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </PitchDiagram>
               </div>
             </div>

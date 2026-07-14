@@ -18,6 +18,7 @@ export default function PitchDiagram({
   return (
     <div
       onClick={handleClick}
+      data-pitch
       className="relative w-full aspect-[2/3] rounded-xl overflow-hidden border border-black/20 bg-emerald-600 select-none"
       style={{
         backgroundImage:
