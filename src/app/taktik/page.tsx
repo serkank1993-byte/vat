@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/useSession";
-import type { Match, MatchTacticPosition, Player, TacticsContext, Team } from "@/lib/types";
+import type { Match, MatchAttendance, MatchTacticPosition, Player, TacticsContext, Team } from "@/lib/types";
 import { DEFAULT_FORMATION, FORMATIONS, FORMATION_NAMES } from "@/lib/formations";
 import { card, chip, dangerLink, input, primaryButton, secondaryButton, sectionTitle } from "@/lib/ui";
 import PitchDiagram from "@/app/components/PitchDiagram";
@@ -41,6 +41,8 @@ export default function TacticsPage() {
     set_piece_attack: [],
     set_piece_defense: [],
   });
+  const [attendance, setAttendance] = useState<MatchAttendance[]>([]);
+  const [onlyAttending, setOnlyAttending] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -127,15 +129,17 @@ export default function TacticsPage() {
     const match = matches.find((m) => m.id === id);
     const teamId = match?.team_id ?? null;
 
-    const [playersRes, formationRes, tacticsRes] = await Promise.all([
+    const [playersRes, formationRes, tacticsRes, attendanceRes] = await Promise.all([
       teamId
         ? supabase.from("players").select("*").eq("team_id", teamId).order("jersey_number")
         : Promise.resolve({ data: [] as Player[], error: null }),
       supabase.from("match_formations").select("*").eq("match_id", id).maybeSingle(),
       supabase.from("match_tactics").select("*").eq("match_id", id),
+      supabase.from("match_attendance").select("*").eq("match_id", id),
     ]);
     if (playersRes.error) setError(playersRes.error.message);
     setRoster(playersRes.data ?? []);
+    setAttendance(attendanceRes.data ?? []);
 
     const loadedFormation = formationRes.data?.formation ?? DEFAULT_FORMATION;
     setFormation(loadedFormation);
@@ -184,6 +188,10 @@ export default function TacticsPage() {
   function playerLabel(id: number | null) {
     const p = roster.find((pl) => pl.id === id);
     return p ? `#${p.jersey_number} ${p.name}` : "—";
+  }
+
+  function isAttending(playerId: number) {
+    return attendance.some((a) => a.player_id === playerId && a.status === "geliyor");
   }
 
   function handleFormationChange(name: string) {
@@ -328,6 +336,11 @@ export default function TacticsPage() {
   const assignedPlayerIds = new Set(
     startingSlots.map((s) => s.playerId).filter((id): id is number => id != null),
   );
+  const placedIds = new Set(
+    tab !== "starting"
+      ? setPieceMarkers[tab as "set_piece_attack" | "set_piece_defense"].map((m) => m.playerId)
+      : [],
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -365,10 +378,21 @@ export default function TacticsPage() {
                 </button>
               ))}
             </div>
-            <button onClick={toggleFullscreen} className={secondaryButton}>
-              {isFullscreen ? <MinimizeIcon className="h-4 w-4" /> : <MaximizeIcon className="h-4 w-4" />}
-              {isFullscreen ? "Küçült" : "Tam Ekran"}
-            </button>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 text-sm text-foreground/70">
+                <input
+                  type="checkbox"
+                  checked={onlyAttending}
+                  onChange={(e) => setOnlyAttending(e.target.checked)}
+                  className="h-4 w-4 accent-accent"
+                />
+                Sadece &quot;Geliyorum&quot; diyenler
+              </label>
+              <button onClick={toggleFullscreen} className={secondaryButton}>
+                {isFullscreen ? <MinimizeIcon className="h-4 w-4" /> : <MaximizeIcon className="h-4 w-4" />}
+                {isFullscreen ? "Küçült" : "Tam Ekran"}
+              </button>
+            </div>
           </div>
 
           {!canEdit && (
@@ -409,6 +433,7 @@ export default function TacticsPage() {
                         <option value="">Boş</option>
                         {roster
                           .filter((p) => !assignedPlayerIds.has(p.id) || p.id === slot.playerId)
+                          .filter((p) => !onlyAttending || p.id === slot.playerId || isAttending(p.id))
                           .map((p) => (
                             <option key={p.id} value={p.id}>
                               #{p.jersey_number} {p.name}
@@ -459,36 +484,40 @@ export default function TacticsPage() {
                   Bir oyuncuya tıklayın, sonra saha üzerinde duracağı yere tıklayın.
                 </p>
                 <div className={`${card} flex flex-col gap-1.5 max-h-[28rem] overflow-y-auto`}>
-                  {roster.map((p) => {
-                    const placed = setPieceMarkers[tab as "set_piece_attack" | "set_piece_defense"].some(
-                      (m) => m.playerId === p.id,
-                    );
-                    return (
-                      <div key={p.id} className="flex items-center gap-2">
-                        <button
-                          onClick={() => canEdit && setSelectedPlayerId(p.id)}
-                          disabled={!canEdit}
-                          className={`flex-1 text-left rounded-md px-2 py-1.5 text-sm transition ${
-                            selectedPlayerId === p.id
-                              ? "bg-accent text-accent-foreground"
-                              : placed
-                                ? "bg-foreground/10"
-                                : "hover:bg-foreground/5"
-                          }`}
-                        >
-                          #{p.jersey_number} {p.name}
-                        </button>
-                        {placed && canEdit && (
+                  {roster
+                    .filter((p) => !onlyAttending || isAttending(p.id) || placedIds.has(p.id))
+                    .map((p) => {
+                      const placed = setPieceMarkers[tab as "set_piece_attack" | "set_piece_defense"].some(
+                        (m) => m.playerId === p.id,
+                      );
+                      return (
+                        <div key={p.id} className="flex items-center gap-2">
                           <button
-                            onClick={() => handleRemoveMarker(tab as "set_piece_attack" | "set_piece_defense", p.id)}
-                            className={dangerLink}
+                            onClick={() => canEdit && setSelectedPlayerId(p.id)}
+                            disabled={!canEdit}
+                            className={`flex-1 text-left rounded-md px-2 py-1.5 text-sm transition ${
+                              selectedPlayerId === p.id
+                                ? "bg-accent text-accent-foreground"
+                                : placed
+                                  ? "bg-foreground/10"
+                                  : "hover:bg-foreground/5"
+                            }`}
                           >
-                            Kaldır
+                            #{p.jersey_number} {p.name}
                           </button>
-                        )}
-                      </div>
-                    );
-                  })}
+                          {placed && canEdit && (
+                            <button
+                              onClick={() =>
+                                handleRemoveMarker(tab as "set_piece_attack" | "set_piece_defense", p.id)
+                              }
+                              className={dangerLink}
+                            >
+                              Kaldır
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
               <div className={`w-full mx-auto lg:mx-0 ${isFullscreen ? "max-w-2xl" : "max-w-md"}`}>
