@@ -45,24 +45,25 @@ export default function NavBar() {
           </span>
           SahaIçi
         </Link>
-        {LINKS.map((link) => {
-          const active = pathname === link.href;
-          const Icon = link.icon;
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors duration-300 ${
-                active
-                  ? "bg-accent text-accent-foreground shadow-sm"
-                  : "text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-              {link.label}
-            </Link>
-          );
-        })}
+        {session &&
+          LINKS.map((link) => {
+            const active = pathname === link.href;
+            const Icon = link.icon;
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors duration-300 ${
+                  active
+                    ? "bg-accent text-accent-foreground shadow-sm"
+                    : "text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {link.label}
+              </Link>
+            );
+          })}
         <div className="ml-auto flex items-center gap-1 shrink-0">
           <ThemeToggle />
           {session ? (

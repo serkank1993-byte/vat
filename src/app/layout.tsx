@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import NavBar from "./components/NavBar";
+import AuthGuard from "./components/AuthGuard";
 import RegisterServiceWorker from "./components/RegisterServiceWorker";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
@@ -54,7 +55,7 @@ export default function RootLayout({
         <RegisterServiceWorker />
         <NavBar />
         <main className="flex-1 mx-auto w-full max-w-7xl px-6 py-8">
-          {children}
+          <AuthGuard>{children}</AuthGuard>
         </main>
       </body>
     </html>
