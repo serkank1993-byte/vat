@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useSession } from "@/lib/useSession";
 import type { Player, Team } from "@/lib/types";
 import { card, dangerLink, input, primaryButton, secondaryButton } from "@/lib/ui";
 import { uploadImage } from "@/lib/storage";
@@ -33,6 +34,7 @@ function base64ToFile(base64: string, mimeType: string, filename: string): File 
 }
 
 export default function PlayersPage() {
+  const { session } = useSession();
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [name, setName] = useState("");
@@ -41,6 +43,9 @@ export default function PlayersPage() {
   const [teamId, setTeamId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [myPlayer, setMyPlayer] = useState<Player | null>(null);
+  const [roleLoading, setRoleLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [positionFilter, setPositionFilter] = useState("");
   const [inviteLinks, setInviteLinks] = useState<Record<number, string>>({});
@@ -71,6 +76,46 @@ export default function PlayersPage() {
     loadData();
   }, []);
 
+  async function loadRole() {
+    setRoleLoading(true);
+    const { data: adminData } = await supabase.rpc("is_admin");
+    setIsAdmin(Boolean(adminData));
+
+    if (session) {
+      const { data: playerRow } = await supabase
+        .from("players")
+        .select("*")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+      setMyPlayer(playerRow ?? null);
+    } else {
+      setMyPlayer(null);
+    }
+    setRoleLoading(false);
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadRole();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
+
+  function canManageTeam(teamId: number | null) {
+    if (isAdmin) return true;
+    return myPlayer?.role === "captain" && teamId != null && myPlayer.team_id === teamId;
+  }
+
+  function canEditCard(player: Player) {
+    return canManageTeam(player.team_id) || myPlayer?.id === player.id;
+  }
+
+  useEffect(() => {
+    if (!roleLoading && !isAdmin && myPlayer?.role === "captain" && myPlayer.team_id != null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTeamId(String(myPlayer.team_id));
+    }
+  }, [roleLoading, isAdmin, myPlayer]);
+
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !jerseyNumber) return;
@@ -85,7 +130,7 @@ export default function PlayersPage() {
       setName("");
       setJerseyNumber("");
       setPosition("");
-      setTeamId("");
+      setTeamId(!isAdmin && myPlayer?.team_id != null ? String(myPlayer.team_id) : "");
       loadData();
     }
   }
@@ -237,38 +282,46 @@ export default function PlayersPage() {
     <div className="flex flex-col gap-6">
       <PageHeading icon={UserIcon} title="Oyuncular" />
 
-      <form onSubmit={handleAdd} className={`${card} flex flex-wrap gap-2`}>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Oyuncu adı"
-          className={`flex-1 min-w-[160px] ${input}`}
-        />
-        <input
-          value={jerseyNumber}
-          onChange={(e) => setJerseyNumber(e.target.value)}
-          placeholder="#"
-          type="number"
-          className={`w-20 ${input}`}
-        />
-        <input
-          value={position}
-          onChange={(e) => setPosition(e.target.value)}
-          placeholder="Mevki"
-          className={`w-32 ${input}`}
-        />
-        <select value={teamId} onChange={(e) => setTeamId(e.target.value)} className={input}>
-          <option value="">Takımsız</option>
-          {teams.map((team) => (
-            <option key={team.id} value={team.id}>
-              {team.name}
-            </option>
-          ))}
-        </select>
-        <button type="submit" className={primaryButton}>
-          Ekle
-        </button>
-      </form>
+      {!roleLoading && (isAdmin || myPlayer?.role === "captain") && (
+        <form onSubmit={handleAdd} className={`${card} flex flex-wrap gap-2`}>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Oyuncu adı"
+            className={`flex-1 min-w-[160px] ${input}`}
+          />
+          <input
+            value={jerseyNumber}
+            onChange={(e) => setJerseyNumber(e.target.value)}
+            placeholder="#"
+            type="number"
+            className={`w-20 ${input}`}
+          />
+          <input
+            value={position}
+            onChange={(e) => setPosition(e.target.value)}
+            placeholder="Mevki"
+            className={`w-32 ${input}`}
+          />
+          {isAdmin ? (
+            <select value={teamId} onChange={(e) => setTeamId(e.target.value)} className={input}>
+              <option value="">Takımsız</option>
+              {teams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className={`flex items-center px-3 text-sm text-foreground/60 ${input} border-transparent`}>
+              {teamName(myPlayer?.team_id ?? null)}
+            </span>
+          )}
+          <button type="submit" className={primaryButton}>
+            Ekle
+          </button>
+        </form>
+      )}
 
       {players.length > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -302,12 +355,18 @@ export default function PlayersPage() {
             <div key={player.id} className={`${card} flex flex-col gap-2`}>
               <div className="flex items-center justify-between">
                 <span>
-                  <button
-                    onClick={() => toggleExpand(player)}
-                    className="font-medium hover:underline"
-                  >
-                    #{player.jersey_number} {player.name}
-                  </button>{" "}
+                  {canEditCard(player) ? (
+                    <button
+                      onClick={() => toggleExpand(player)}
+                      className="font-medium hover:underline"
+                    >
+                      #{player.jersey_number} {player.name}
+                    </button>
+                  ) : (
+                    <span className="font-medium">
+                      #{player.jersey_number} {player.name}
+                    </span>
+                  )}{" "}
                   <span className="text-foreground/50">
                     {player.position ?? ""} · {teamName(player.team_id)}
                   </span>
@@ -322,17 +381,19 @@ export default function PlayersPage() {
                     </span>
                   )}
                 </span>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => handleToggleCaptain(player)} className="text-sm text-accent hover:underline">
-                    {player.role === "captain" ? "Kaptanlıktan çıkar" : "Kaptan yap"}
-                  </button>
-                  <button onClick={() => handleDelete(player.id)} className={dangerLink}>
-                    Sil
-                  </button>
-                </div>
+                {canManageTeam(player.team_id) && (
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => handleToggleCaptain(player)} className="text-sm text-accent hover:underline">
+                      {player.role === "captain" ? "Kaptanlıktan çıkar" : "Kaptan yap"}
+                    </button>
+                    <button onClick={() => handleDelete(player.id)} className={dangerLink}>
+                      Sil
+                    </button>
+                  </div>
+                )}
               </div>
 
-              {!player.user_id && (
+              {!player.user_id && canManageTeam(player.team_id) && (
                 <div className="flex items-center gap-2">
                   {inviteLinks[player.id] ? (
                     <>
@@ -357,7 +418,7 @@ export default function PlayersPage() {
                 </div>
               )}
 
-              {expandedId === player.id && (
+              {expandedId === player.id && canEditCard(player) && (
                 <div className="flex flex-col sm:flex-row gap-4 border-t border-border pt-4 mt-1">
                   <PlayerCard player={player} team={teams.find((t) => t.id === player.team_id) ?? null} />
                   <div className="flex-1 flex flex-col gap-3">
