@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { card, input, primaryButton } from "@/lib/ui";
@@ -25,6 +26,7 @@ function SignupForm() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const [existingAccount, setExistingAccount] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -66,8 +68,9 @@ function SignupForm() {
       if (claimError) setError(claimError.message);
       else router.push("/hesabim");
     } else if (data.user && data.user.identities && data.user.identities.length === 0) {
-      setError("Bu e-posta adresiyle zaten bir hesap var. Giriş yapmayı deneyin.");
+      localStorage.setItem(PENDING_TOKEN_KEY, token);
       setSubmitting(false);
+      setExistingAccount(true);
     } else {
       localStorage.setItem(PENDING_TOKEN_KEY, token);
       setSubmitting(false);
@@ -85,6 +88,20 @@ function SignupForm() {
           E-postana gönderilen onay linkine tıkla, ardından giriş yaparak profiline otomatik
           bağlanacaksın.
         </p>
+      </div>
+    );
+  }
+
+  if (existingAccount) {
+    return (
+      <div className={`${card} max-w-sm flex flex-col gap-3`}>
+        <p className="text-sm">
+          Bu e-posta adresiyle zaten bir hesabın var. Giriş yaptığında davetin otomatik olarak
+          hesabına bağlanacak.
+        </p>
+        <Link href="/giris" className={primaryButton}>
+          Giriş Yap
+        </Link>
       </div>
     );
   }

@@ -19,6 +19,7 @@ export default function AdminSetupPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const [existingAccount, setExistingAccount] = useState(false);
 
   useEffect(() => {
     supabase.rpc("admin_exists").then(({ data }) => {
@@ -49,8 +50,9 @@ export default function AdminSetupPage() {
       if (bootstrapError) setError(bootstrapError.message);
       else router.push("/teams");
     } else if (data.user && data.user.identities && data.user.identities.length === 0) {
-      setError("Bu e-posta adresiyle zaten bir hesap var. Giriş yapmayı deneyin.");
+      localStorage.setItem(PENDING_BOOTSTRAP_KEY, "1");
       setSubmitting(false);
+      setExistingAccount(true);
     } else {
       localStorage.setItem(PENDING_BOOTSTRAP_KEY, "1");
       setSubmitting(false);
@@ -82,6 +84,20 @@ export default function AdminSetupPage() {
           E-postana gönderilen onay linkine tıkla, ardından giriş yaparak yönetici hesabın otomatik
           oluşturulacak.
         </p>
+      </div>
+    );
+  }
+
+  if (existingAccount) {
+    return (
+      <div className={`${card} max-w-sm flex flex-col gap-3`}>
+        <p className="text-sm">
+          Bu e-posta adresiyle zaten bir hesabın var. Giriş yaptığında yönetici hesabın otomatik
+          oluşturulacak.
+        </p>
+        <a href="/giris" className={primaryButton}>
+          Giriş Yap
+        </a>
       </div>
     );
   }
