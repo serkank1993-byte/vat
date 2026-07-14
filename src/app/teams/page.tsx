@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import type { Team } from "@/lib/types";
+import { useSession } from "@/lib/useSession";
+import type { Player, Team } from "@/lib/types";
 import { card, dangerLink, input, primaryButton, secondaryButton } from "@/lib/ui";
 import TeamRecordsPanel from "@/app/components/TeamRecordsPanel";
 import { uploadImage } from "@/lib/storage";
@@ -11,9 +12,13 @@ import EmptyState from "@/app/components/EmptyState";
 import { ShieldIcon } from "@/lib/icons";
 
 export default function TeamsPage() {
+  const { session } = useSession();
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [myPlayer, setMyPlayer] = useState<Player | null>(null);
+  const [roleLoading, setRoleLoading] = useState(true);
 
   const [name, setName] = useState("");
   const [foundedDate, setFoundedDate] = useState("");
@@ -31,21 +36,52 @@ export default function TeamsPage() {
 
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  async function loadTeams() {
+  async function loadRole() {
+    setRoleLoading(true);
+    const { data: adminData } = await supabase.rpc("is_admin");
+    setIsAdmin(Boolean(adminData));
+
+    if (session) {
+      const { data: playerRow } = await supabase
+        .from("players")
+        .select("*")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+      setMyPlayer(playerRow ?? null);
+    } else {
+      setMyPlayer(null);
+    }
+    setRoleLoading(false);
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadRole();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
+
+  async function loadTeams(admin: boolean, teamId: number | null) {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("teams")
-      .select("*")
-      .order("created_at", { ascending: false });
+    let query = supabase.from("teams").select("*").order("created_at", { ascending: false });
+    if (!admin) {
+      if (teamId == null) {
+        setTeams([]);
+        setLoading(false);
+        return;
+      }
+      query = query.eq("id", teamId);
+    }
+    const { data, error } = await query;
     if (error) setError(error.message);
     else setTeams(data ?? []);
     setLoading(false);
   }
 
   useEffect(() => {
+    if (roleLoading) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadTeams();
-  }, []);
+    loadTeams(isAdmin, myPlayer?.team_id ?? null);
+  }, [roleLoading, isAdmin, myPlayer]);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -78,13 +114,13 @@ export default function TeamsPage() {
     setSecondaryColor("");
     setJerseyFile(null);
     setLogoFile(null);
-    loadTeams();
+    loadTeams(isAdmin, myPlayer?.team_id ?? null);
   }
 
   async function handleDelete(id: number) {
     const { error } = await supabase.from("teams").delete().eq("id", id);
     if (error) setError(error.message);
-    else loadTeams();
+    else loadTeams(isAdmin, myPlayer?.team_id ?? null);
   }
 
   function startEdit(team: Team) {
@@ -118,13 +154,14 @@ export default function TeamsPage() {
       if (url) await supabase.from("teams").update({ logo_url: url }).eq("id", team.id);
     }
     setEditingId(null);
-    loadTeams();
+    loadTeams(isAdmin, myPlayer?.team_id ?? null);
   }
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeading icon={ShieldIcon} title="Takımlar" />
 
+      {isAdmin && (
       <form onSubmit={handleAdd} className={`${card} flex flex-col gap-3 max-w-xl`}>
         <input
           value={name}
@@ -185,12 +222,16 @@ export default function TeamsPage() {
           Ekle
         </button>
       </form>
+      )}
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-      {loading ? (
+      {loading || roleLoading ? (
         <p className="text-foreground/60">Yükleniyor...</p>
       ) : teams.length === 0 ? (
-        <EmptyState icon={ShieldIcon} message="Henüz takım yok." />
+        <EmptyState
+          icon={ShieldIcon}
+          message={isAdmin ? "Henüz takım yok." : "Henüz bir takıma bağlı değilsin."}
+        />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {teams.map((team) => (
@@ -305,14 +346,16 @@ export default function TeamsPage() {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
-                    <div className="flex items-center gap-3">
-                      <button onClick={() => startEdit(team)} className="text-sm text-accent hover:underline">
-                        Düzenle
-                      </button>
-                      <button onClick={() => handleDelete(team.id)} className={dangerLink}>
-                        Sil
-                      </button>
-                    </div>
+                    {isAdmin && (
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => startEdit(team)} className="text-sm text-accent hover:underline">
+                          Düzenle
+                        </button>
+                        <button onClick={() => handleDelete(team.id)} className={dangerLink}>
+                          Sil
+                        </button>
+                      </div>
+                    )}
                     <button
                       onClick={() => setExpandedId(expandedId === team.id ? null : team.id)}
                       className="text-xs text-foreground/60 hover:underline"
