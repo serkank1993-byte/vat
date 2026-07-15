@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Match, Team } from "@/lib/types";
-import { card, dangerLink, input, primaryButton } from "@/lib/ui";
+import { card, chip, dangerLink, input, primaryButton } from "@/lib/ui";
 import PageHeading from "@/app/components/PageHeading";
 import EmptyState from "@/app/components/EmptyState";
+import MatchCalendar from "@/app/components/MatchCalendar";
 import { CalendarIcon } from "@/lib/icons";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -23,6 +24,11 @@ export default function MatchesPage() {
   const [teamId, setTeamId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<"takvim" | "liste">("takvim");
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
 
   async function loadData() {
     setLoading(true);
@@ -72,7 +78,16 @@ export default function MatchesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeading icon={CalendarIcon} title="Maçlar" />
+      <PageHeading icon={CalendarIcon} title="Fikstür" />
+
+      <div className="flex flex-wrap gap-2">
+        <button onClick={() => setView("takvim")} className={chip(view === "takvim")}>
+          Takvim
+        </button>
+        <button onClick={() => setView("liste")} className={chip(view === "liste")}>
+          Liste
+        </button>
+      </div>
 
       <form onSubmit={handleAdd} className={`${card} flex flex-wrap gap-2`}>
         <select value={teamId} onChange={(e) => setTeamId(e.target.value)} className={input}>
@@ -111,6 +126,8 @@ export default function MatchesPage() {
         <p className="text-foreground/60">Yükleniyor...</p>
       ) : matches.length === 0 ? (
         <EmptyState icon={CalendarIcon} message="Henüz maç yok." />
+      ) : view === "takvim" ? (
+        <MatchCalendar matches={matches} teams={teams} month={calendarMonth} onMonthChange={setCalendarMonth} />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {matches.map((match) => {

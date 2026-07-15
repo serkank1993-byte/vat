@@ -21,7 +21,7 @@ import ThemeToggle from "./ThemeToggle";
 const LINKS = [
   { href: "/teams", label: "Takımlar", icon: ShieldIcon },
   { href: "/players", label: "Oyuncular", icon: UserIcon },
-  { href: "/matches", label: "Maçlar", icon: CalendarIcon },
+  { href: "/matches", label: "Fikstür", icon: CalendarIcon },
   { href: "/katilim", label: "Katılım", icon: CheckCircleIcon },
   { href: "/taktik", label: "Taktik", icon: TacticsBoardIcon },
   { href: "/live", label: "Canlı Takip", icon: ActivityIcon },

@@ -14,7 +14,7 @@ import {
 const SECTIONS = [
   { href: "/teams", title: "Takımlar", description: "Takımlarını oluştur ve yönet.", icon: ShieldIcon },
   { href: "/players", title: "Oyuncular", description: "Kadro ve forma numaralarını takip et.", icon: UserIcon },
-  { href: "/matches", title: "Maçlar", description: "Fikstür ve maç sonuçlarını kaydet.", icon: CalendarIcon },
+  { href: "/matches", title: "Fikstür", description: "Fikstür ve maç sonuçlarını kaydet.", icon: CalendarIcon },
   { href: "/katilim", title: "Katılım", description: "Maça kimin geldiğini takip et.", icon: CheckCircleIcon },
   {
     href: "/taktik",
