@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/useSession";
 import type { MatchAttendance, MatchEvent, Player } from "@/lib/types";
@@ -12,7 +13,9 @@ import { UserCircleIcon } from "@/lib/icons";
 
 const PENDING_TOKEN_KEY = "vat_pending_invite_token";
 
-export default function AccountPage() {
+function AccountPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { session, loading: sessionLoading } = useSession();
   const [player, setPlayer] = useState<Player | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -31,10 +34,11 @@ export default function AccountPage() {
   async function loadPlayer(userId: string) {
     setLoading(true);
 
-    const pendingToken = localStorage.getItem(PENDING_TOKEN_KEY);
+    const pendingToken = searchParams.get("invite_token") || localStorage.getItem(PENDING_TOKEN_KEY);
     if (pendingToken) {
       await supabase.rpc("claim_player_invite", { p_token: pendingToken });
       localStorage.removeItem(PENDING_TOKEN_KEY);
+      if (searchParams.get("invite_token")) router.replace("/hesabim");
     }
 
     const { data: adminData } = await supabase.rpc("is_admin");
@@ -68,6 +72,7 @@ export default function AccountPage() {
     } else if (!sessionLoading) {
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, sessionLoading]);
 
   async function handleSave(e: React.FormEvent) {
@@ -212,5 +217,13 @@ export default function AccountPage() {
         Çıkış Yap
       </button>
     </div>
+  );
+}
+
+export default function AccountPage() {
+  return (
+    <Suspense fallback={<p className="text-foreground/60">Yükleniyor...</p>}>
+      <AccountPageContent />
+    </Suspense>
   );
 }

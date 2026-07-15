@@ -54,7 +54,7 @@ function SignupForm() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/hesabim` },
+      options: { emailRedirectTo: `${window.location.origin}/hesabim?invite_token=${encodeURIComponent(token)}` },
     });
     if (error) {
       setError(error.message);
