@@ -18,6 +18,12 @@ const STATUS_LABELS: Record<string, string> = {
 
 const DEFAULT_COMPETITION_COLOR = "#059669";
 
+function toDatetimeLocalValue(dateStr: string) {
+  const d = new Date(dateStr);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export default function MatchesPage() {
   const { session } = useSession();
   const [matches, setMatches] = useState<Match[]>([]);
@@ -42,6 +48,18 @@ export default function MatchesPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [myPlayer, setMyPlayer] = useState<Player | null>(null);
   const [roleLoading, setRoleLoading] = useState(true);
+
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editOpponentName, setEditOpponentName] = useState("");
+  const [editMatchDate, setEditMatchDate] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [editCompetitionId, setEditCompetitionId] = useState("");
+  const [editStatus, setEditStatus] = useState<"scheduled" | "completed">("scheduled");
+  const [editScoreFor, setEditScoreFor] = useState("");
+  const [editScoreAgainst, setEditScoreAgainst] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null);
 
   async function loadData() {
     setLoading(true);
@@ -122,7 +140,49 @@ export default function MatchesPage() {
   async function handleDelete(id: number) {
     const { error } = await supabase.from("matches").delete().eq("id", id);
     if (error) setError(error.message);
-    else loadData();
+    else {
+      if (selectedMatchId === id) setSelectedMatchId(null);
+      loadData();
+    }
+  }
+
+  function startEdit(match: Match) {
+    setEditingId(match.id);
+    setEditOpponentName(match.opponent_name);
+    setEditMatchDate(toDatetimeLocalValue(match.match_date));
+    setEditLocation(match.location ?? "");
+    setEditCompetitionId(match.competition_id ? String(match.competition_id) : "");
+    setEditStatus(match.status === "completed" || match.status === "finished" ? "completed" : "scheduled");
+    setEditScoreFor(match.score_for != null ? String(match.score_for) : "");
+    setEditScoreAgainst(match.score_against != null ? String(match.score_against) : "");
+    setError(null);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+  }
+
+  async function handleSaveEdit(match: Match) {
+    if (!editOpponentName.trim() || !editMatchDate) return;
+    setSavingEdit(true);
+    const { error } = await supabase
+      .from("matches")
+      .update({
+        opponent_name: editOpponentName,
+        match_date: editMatchDate,
+        location: editLocation || null,
+        competition_id: editCompetitionId ? Number(editCompetitionId) : null,
+        status: editStatus,
+        score_for: editStatus === "completed" && editScoreFor !== "" ? Number(editScoreFor) : null,
+        score_against: editStatus === "completed" && editScoreAgainst !== "" ? Number(editScoreAgainst) : null,
+      })
+      .eq("id", match.id);
+    setSavingEdit(false);
+    if (error) setError(error.message);
+    else {
+      setEditingId(null);
+      loadData();
+    }
   }
 
   async function handleAddCompetition(e: React.FormEvent) {
@@ -160,6 +220,137 @@ export default function MatchesPage() {
 
   const filteredMatches =
     competitionFilter === "all" ? matches : matches.filter((m) => m.competition_id === competitionFilter);
+
+  function renderMatch(match: Match) {
+    if (editingId === match.id) {
+      return (
+        <div key={match.id} className={`${card} flex flex-col gap-2`}>
+          <div className="flex flex-wrap gap-2">
+            <input
+              value={editOpponentName}
+              onChange={(e) => setEditOpponentName(e.target.value)}
+              placeholder="Rakip"
+              className={`flex-1 min-w-[140px] ${input}`}
+            />
+            <input
+              value={editMatchDate}
+              onChange={(e) => setEditMatchDate(e.target.value)}
+              type="datetime-local"
+              className={input}
+            />
+            <input
+              value={editLocation}
+              onChange={(e) => setEditLocation(e.target.value)}
+              placeholder="Konum"
+              className={`w-32 ${input}`}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <select
+              value={editCompetitionId}
+              onChange={(e) => setEditCompetitionId(e.target.value)}
+              className={input}
+            >
+              <option value="">Lig yok</option>
+              {competitions
+                .filter((c) => c.team_id === match.team_id)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+            </select>
+            <select
+              value={editStatus}
+              onChange={(e) => setEditStatus(e.target.value as "scheduled" | "completed")}
+              className={input}
+            >
+              <option value="scheduled">Planlandı</option>
+              <option value="completed">Tamamlandı</option>
+            </select>
+            {editStatus === "completed" && (
+              <>
+                <input
+                  value={editScoreFor}
+                  onChange={(e) => setEditScoreFor(e.target.value)}
+                  type="number"
+                  placeholder="Gol (biz)"
+                  className={`w-24 ${input}`}
+                />
+                <input
+                  value={editScoreAgainst}
+                  onChange={(e) => setEditScoreAgainst(e.target.value)}
+                  type="number"
+                  placeholder="Gol (rakip)"
+                  className={`w-24 ${input}`}
+                />
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => handleSaveEdit(match)}
+              disabled={savingEdit}
+              className={`self-start ${primaryButton}`}
+            >
+              {savingEdit ? "Kaydediliyor..." : "Kaydet"}
+            </button>
+            <button onClick={cancelEdit} className={`self-start ${secondaryButton}`}>
+              İptal
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    const isCompleted = (match.status ?? "scheduled") === "completed" || match.status === "finished";
+    const comp = competition(match.competition_id);
+    return (
+      <div key={match.id} className={`${card} flex items-center justify-between gap-3`}>
+        <div className="flex flex-col gap-1.5">
+          <span className="font-medium">
+            {teamName(match.team_id)} - {match.opponent_name}
+            {match.score_for != null && match.score_against != null && (
+              <span className="ml-2 text-foreground/60">
+                ({match.score_for}-{match.score_against})
+              </span>
+            )}
+          </span>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-foreground/50">
+            <span>
+              {new Date(match.match_date).toLocaleString("tr-TR")}
+              {match.location ? ` · ${match.location}` : ""}
+            </span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                isCompleted ? "bg-accent/15 text-accent" : "bg-foreground/10 text-foreground/60"
+              }`}
+            >
+              {STATUS_LABELS[match.status ?? "scheduled"] ?? match.status}
+            </span>
+            {comp && (
+              <span
+                className="rounded-full px-2.5 py-1 text-xs font-semibold text-white"
+                style={{ backgroundColor: comp.color ?? DEFAULT_COMPETITION_COLOR }}
+              >
+                {comp.name}
+              </span>
+            )}
+          </div>
+        </div>
+        {canManageTeam(match.team_id) && (
+          <div className="flex items-center gap-3 shrink-0">
+            <button onClick={() => startEdit(match)} className="text-sm text-accent hover:underline">
+              Düzenle
+            </button>
+            <button onClick={() => handleDelete(match.id)} className={dangerLink}>
+              Sil
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -311,58 +502,37 @@ export default function MatchesPage() {
       ) : filteredMatches.length === 0 ? (
         <EmptyState icon={CalendarIcon} message="Bu lige/turnuvaya ait maç yok." />
       ) : view === "takvim" ? (
-        <MatchCalendar
-          matches={filteredMatches}
-          teams={teams}
-          competitions={competitions}
-          month={calendarMonth}
-          onMonthChange={setCalendarMonth}
-        />
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {filteredMatches.map((match) => {
-            const isCompleted = (match.status ?? "scheduled") === "completed" || match.status === "finished";
-            const comp = competition(match.competition_id);
-            return (
-              <div key={match.id} className={`${card} flex items-center justify-between gap-3`}>
-                <div className="flex flex-col gap-1.5">
-                  <span className="font-medium">
-                    {teamName(match.team_id)} - {match.opponent_name}
-                  </span>
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-foreground/50">
-                    <span>
-                      {new Date(match.match_date).toLocaleString("tr-TR")}
-                      {match.location ? ` · ${match.location}` : ""}
-                    </span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        isCompleted ? "bg-accent/15 text-accent" : "bg-foreground/10 text-foreground/60"
-                      }`}
+        <div className="flex flex-col gap-4">
+          <MatchCalendar
+            matches={filteredMatches}
+            teams={teams}
+            competitions={competitions}
+            month={calendarMonth}
+            onMonthChange={setCalendarMonth}
+            onSelectMatch={setSelectedMatchId}
+          />
+          {selectedMatchId != null &&
+            (() => {
+              const selected = filteredMatches.find((m) => m.id === selectedMatchId);
+              if (!selected) return null;
+              return (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <h2 className={sectionTitle}>Maç Detayı</h2>
+                    <button
+                      onClick={() => setSelectedMatchId(null)}
+                      className="text-sm text-foreground/50 hover:text-foreground transition-colors duration-300"
                     >
-                      {STATUS_LABELS[match.status ?? "scheduled"] ?? match.status}
-                    </span>
-                    {comp && (
-                      <span
-                        className="rounded-full px-2 py-0.5 text-xs font-medium"
-                        style={{
-                          backgroundColor: `${comp.color ?? DEFAULT_COMPETITION_COLOR}22`,
-                          color: comp.color ?? DEFAULT_COMPETITION_COLOR,
-                        }}
-                      >
-                        {comp.name}
-                      </span>
-                    )}
+                      Kapat
+                    </button>
                   </div>
+                  {renderMatch(selected)}
                 </div>
-                {canManageTeam(match.team_id) && (
-                  <button onClick={() => handleDelete(match.id)} className={dangerLink}>
-                    Sil
-                  </button>
-                )}
-              </div>
-            );
-          })}
+              );
+            })()}
         </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{filteredMatches.map((match) => renderMatch(match))}</div>
       )}
     </div>
   );

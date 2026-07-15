@@ -16,12 +16,14 @@ export default function MatchCalendar({
   competitions,
   month,
   onMonthChange,
+  onSelectMatch,
 }: {
   matches: Match[];
   teams: Team[];
   competitions: Competition[];
   month: Date;
   onMonthChange: (next: Date) => void;
+  onSelectMatch?: (id: number) => void;
 }) {
   function teamName(id: number | null) {
     return teams.find((t) => t.id === id)?.name ?? "—";
@@ -103,22 +105,18 @@ export default function MatchCalendar({
                 {dayMatches.slice(0, 2).map((m) => {
                   const color = m.competition_id ? competitionColor(m.competition_id) : null;
                   return (
-                    <span
+                    <button
                       key={m.id}
+                      onClick={() => onSelectMatch?.(m.id)}
                       title={`${teamName(m.team_id)} - ${m.opponent_name} · ${new Date(m.match_date).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}`}
-                      className="flex items-center gap-1 truncate rounded bg-accent/15 px-1 py-0.5 text-[10px] font-medium text-accent"
+                      className={`w-full truncate rounded px-1 py-0.5 text-left text-[10px] font-semibold transition-colors duration-300 ${
+                        color ? "text-white hover:brightness-110" : "bg-accent/15 text-accent hover:bg-accent/25"
+                      }`}
+                      style={color ? { backgroundColor: color } : undefined}
                     >
-                      {color && (
-                        <span
-                          className="h-1.5 w-1.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: color }}
-                        />
-                      )}
-                      <span className="truncate">
-                        {new Date(m.match_date).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}{" "}
-                        {m.opponent_name}
-                      </span>
-                    </span>
+                      {new Date(m.match_date).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}{" "}
+                      {m.opponent_name}
+                    </button>
                   );
                 })}
                 {dayMatches.length > 2 && (
