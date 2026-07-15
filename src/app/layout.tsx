@@ -17,12 +17,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SahaIçi — Video Taktik Analiz",
+  title: "Rohan FC",
   description: "Futbol maç ve video taktik analiz aracı",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "SahaIçi",
+    title: "Rohan FC",
   },
   icons: {
     icon: [

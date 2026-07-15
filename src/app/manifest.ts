@@ -4,8 +4,8 @@ export const dynamic = "force-static";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "SahaIçi — Video Taktik Analiz",
-    short_name: "SahaIçi",
+    name: "Rohan FC",
+    short_name: "Rohan FC",
     description: "Futbol maç ve video taktik analiz aracı",
     start_url: "/",
     display: "standalone",
