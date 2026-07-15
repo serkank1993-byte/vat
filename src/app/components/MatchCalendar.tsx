@@ -1,9 +1,10 @@
 "use client";
 
-import type { Match, Team } from "@/lib/types";
+import type { Competition, Match, Team } from "@/lib/types";
 import { card, secondaryButton } from "@/lib/ui";
 
 const WEEKDAY_LABELS = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
+const DEFAULT_COMPETITION_COLOR = "#059669";
 
 function dateKey(d: Date) {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
@@ -12,16 +13,22 @@ function dateKey(d: Date) {
 export default function MatchCalendar({
   matches,
   teams,
+  competitions,
   month,
   onMonthChange,
 }: {
   matches: Match[];
   teams: Team[];
+  competitions: Competition[];
   month: Date;
   onMonthChange: (next: Date) => void;
 }) {
   function teamName(id: number | null) {
     return teams.find((t) => t.id === id)?.name ?? "—";
+  }
+
+  function competitionColor(id: number | null) {
+    return competitions.find((c) => c.id === id)?.color ?? DEFAULT_COMPETITION_COLOR;
   }
 
   const matchesByDate = new Map<string, Match[]>();
@@ -93,16 +100,27 @@ export default function MatchCalendar({
                 {d.getDate()}
               </span>
               <div className="flex flex-col gap-1">
-                {dayMatches.slice(0, 2).map((m) => (
-                  <span
-                    key={m.id}
-                    title={`${teamName(m.team_id)} - ${m.opponent_name} · ${new Date(m.match_date).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}`}
-                    className="truncate rounded bg-accent/15 px-1 py-0.5 text-[10px] font-medium text-accent"
-                  >
-                    {new Date(m.match_date).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}{" "}
-                    {m.opponent_name}
-                  </span>
-                ))}
+                {dayMatches.slice(0, 2).map((m) => {
+                  const color = m.competition_id ? competitionColor(m.competition_id) : null;
+                  return (
+                    <span
+                      key={m.id}
+                      title={`${teamName(m.team_id)} - ${m.opponent_name} · ${new Date(m.match_date).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}`}
+                      className="flex items-center gap-1 truncate rounded bg-accent/15 px-1 py-0.5 text-[10px] font-medium text-accent"
+                    >
+                      {color && (
+                        <span
+                          className="h-1.5 w-1.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: color }}
+                        />
+                      )}
+                      <span className="truncate">
+                        {new Date(m.match_date).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}{" "}
+                        {m.opponent_name}
+                      </span>
+                    </span>
+                  );
+                })}
                 {dayMatches.length > 2 && (
                   <span className="text-[10px] text-foreground/50">+{dayMatches.length - 2} daha</span>
                 )}

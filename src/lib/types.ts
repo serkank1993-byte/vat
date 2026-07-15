@@ -38,9 +38,18 @@ export type Player = {
   created_at: string;
 };
 
+export type Competition = {
+  id: number;
+  team_id: number | null;
+  name: string;
+  color: string | null;
+  created_at: string;
+};
+
 export type Match = {
   id: number;
   team_id: number | null;
+  competition_id: number | null;
   opponent_name: string;
   match_date: string;
   location: string | null;
