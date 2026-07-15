@@ -5,7 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/useSession";
 import type { AttendanceStatus, Match, MatchAttendance, Player, Team } from "@/lib/types";
-import { card, chip, input, sectionTitle } from "@/lib/ui";
+import { card, chip, input, secondaryButton, sectionTitle } from "@/lib/ui";
 import PageHeading from "@/app/components/PageHeading";
 import EmptyState from "@/app/components/EmptyState";
 import { CheckCircleIcon, MinusCircleIcon, UserIcon, XCircleIcon } from "@/lib/icons";
@@ -95,6 +95,35 @@ export default function AttendancePage() {
 
   function canEdit(playerId: number) {
     return isAdmin || playerId === ownPlayerId;
+  }
+
+  const myPlayer = players.find((p) => p.id === ownPlayerId) ?? null;
+
+  function canManageTeam(tid: number | null) {
+    if (isAdmin) return true;
+    return myPlayer?.role === "captain" && tid != null && myPlayer.team_id === tid;
+  }
+
+  function hasResponded(playerId: number) {
+    return attendance.some((a) => a.player_id === playerId);
+  }
+
+  const nonResponders = useMemo(
+    () => rosterForSelectedMatch.filter((p) => !hasResponded(p.id)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rosterForSelectedMatch, attendance],
+  );
+
+  const [copiedReminder, setCopiedReminder] = useState(false);
+
+  async function handleCopyReminder() {
+    if (!selectedMatch || nonResponders.length === 0) return;
+    const dateLabel = new Date(selectedMatch.match_date).toLocaleDateString("tr-TR");
+    const names = nonResponders.map((p) => `#${p.jersey_number} ${p.name}`).join(", ");
+    const message = `${teamName(selectedMatch.team_id)} - ${selectedMatch.opponent_name} (${dateLabel}) maçı için henüz katılım bildirmeyenler: ${names}`;
+    await navigator.clipboard.writeText(message);
+    setCopiedReminder(true);
+    setTimeout(() => setCopiedReminder(false), 2000);
   }
 
   async function setStatus(playerId: number, status: AttendanceStatus) {
@@ -206,6 +235,25 @@ export default function AttendancePage() {
               </div>
             </div>
           </div>
+
+          {canManageTeam(selectedMatch.team_id) && nonResponders.length > 0 && (
+            <div className={`${card} flex flex-col gap-2`}>
+              <h2 className={sectionTitle}>Henüz Yanıt Vermeyenler ({nonResponders.length})</h2>
+              <div className="flex flex-wrap gap-2">
+                {nonResponders.map((p) => (
+                  <span
+                    key={p.id}
+                    className="rounded-full bg-foreground/10 px-3 py-1 text-sm text-foreground/70"
+                  >
+                    #{p.jersey_number} {p.name}
+                  </span>
+                ))}
+              </div>
+              <button onClick={handleCopyReminder} className={`self-start ${secondaryButton}`}>
+                {copiedReminder ? "Kopyalandı" : "Hatırlatma Metnini Kopyala"}
+              </button>
+            </div>
+          )}
 
           <div className="flex flex-col gap-2">
             <h2 className={sectionTitle}>Kadro</h2>

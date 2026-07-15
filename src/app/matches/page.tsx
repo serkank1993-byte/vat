@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/useSession";
-import type { Competition, Match, Player, Team } from "@/lib/types";
+import type { Competition, Match, Player, Season, Team } from "@/lib/types";
 import { card, chip, dangerLink, input, primaryButton, secondaryButton, sectionTitle } from "@/lib/ui";
 import PageHeading from "@/app/components/PageHeading";
 import EmptyState from "@/app/components/EmptyState";
@@ -29,17 +29,22 @@ export default function MatchesPage() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [competitions, setCompetitions] = useState<Competition[]>([]);
+  const [seasons, setSeasons] = useState<Season[]>([]);
   const [opponentName, setOpponentName] = useState("");
   const [matchDate, setMatchDate] = useState("");
   const [location, setLocation] = useState("");
   const [teamId, setTeamId] = useState("");
   const [competitionId, setCompetitionId] = useState("");
+  const [seasonId, setSeasonId] = useState("");
   const [newCompName, setNewCompName] = useState("");
   const [newCompColor, setNewCompColor] = useState(DEFAULT_COMPETITION_COLOR);
+  const [newSeasonName, setNewSeasonName] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<"takvim" | "liste">("takvim");
   const [competitionFilter, setCompetitionFilter] = useState<number | "all">("all");
+  const [seasonFilter, setSeasonFilter] = useState<number | "all">("all");
+  const [expandedHistoryId, setExpandedHistoryId] = useState<number | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -54,6 +59,7 @@ export default function MatchesPage() {
   const [editMatchDate, setEditMatchDate] = useState("");
   const [editLocation, setEditLocation] = useState("");
   const [editCompetitionId, setEditCompetitionId] = useState("");
+  const [editSeasonId, setEditSeasonId] = useState("");
   const [editStatus, setEditStatus] = useState<"scheduled" | "completed">("scheduled");
   const [editScoreFor, setEditScoreFor] = useState("");
   const [editScoreAgainst, setEditScoreAgainst] = useState("");
@@ -63,15 +69,17 @@ export default function MatchesPage() {
 
   async function loadData() {
     setLoading(true);
-    const [matchesRes, teamsRes, competitionsRes] = await Promise.all([
+    const [matchesRes, teamsRes, competitionsRes, seasonsRes] = await Promise.all([
       supabase.from("matches").select("*").order("match_date", { ascending: false }),
       supabase.from("teams").select("*").order("name"),
       supabase.from("competitions").select("*").order("name"),
+      supabase.from("seasons").select("*").order("name", { ascending: false }),
     ]);
     if (matchesRes.error) setError(matchesRes.error.message);
     else setMatches(matchesRes.data ?? []);
     if (teamsRes.data) setTeams(teamsRes.data);
     if (competitionsRes.data) setCompetitions(competitionsRes.data);
+    if (seasonsRes.data) setSeasons(seasonsRes.data);
     setLoading(false);
   }
 
@@ -125,6 +133,7 @@ export default function MatchesPage() {
       location: location || null,
       team_id: teamId ? Number(teamId) : null,
       competition_id: competitionId ? Number(competitionId) : null,
+      season_id: seasonId ? Number(seasonId) : null,
     });
     if (error) setError(error.message);
     else {
@@ -132,6 +141,7 @@ export default function MatchesPage() {
       setMatchDate("");
       setLocation("");
       setCompetitionId("");
+      setSeasonId("");
       setTeamId(!isAdmin && myPlayer?.team_id != null ? String(myPlayer.team_id) : "");
       loadData();
     }
@@ -152,6 +162,7 @@ export default function MatchesPage() {
     setEditMatchDate(toDatetimeLocalValue(match.match_date));
     setEditLocation(match.location ?? "");
     setEditCompetitionId(match.competition_id ? String(match.competition_id) : "");
+    setEditSeasonId(match.season_id ? String(match.season_id) : "");
     setEditStatus(match.status === "completed" || match.status === "finished" ? "completed" : "scheduled");
     setEditScoreFor(match.score_for != null ? String(match.score_for) : "");
     setEditScoreAgainst(match.score_against != null ? String(match.score_against) : "");
@@ -172,6 +183,7 @@ export default function MatchesPage() {
         match_date: editMatchDate,
         location: editLocation || null,
         competition_id: editCompetitionId ? Number(editCompetitionId) : null,
+        season_id: editSeasonId ? Number(editSeasonId) : null,
         status: editStatus,
         score_for: editStatus === "completed" && editScoreFor !== "" ? Number(editScoreFor) : null,
         score_against: editStatus === "completed" && editScoreAgainst !== "" ? Number(editScoreAgainst) : null,
@@ -210,6 +222,29 @@ export default function MatchesPage() {
     }
   }
 
+  async function handleAddSeason(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newSeasonName.trim() || !teamId) return;
+    const { error } = await supabase.from("seasons").insert({
+      team_id: Number(teamId),
+      name: newSeasonName,
+    });
+    if (error) setError(error.message);
+    else {
+      setNewSeasonName("");
+      loadData();
+    }
+  }
+
+  async function handleDeleteSeason(id: number) {
+    const { error } = await supabase.from("seasons").delete().eq("id", id);
+    if (error) setError(error.message);
+    else {
+      if (seasonFilter === id) setSeasonFilter("all");
+      loadData();
+    }
+  }
+
   function teamName(id: number | null) {
     return teams.find((t) => t.id === id)?.name ?? "—";
   }
@@ -218,8 +253,26 @@ export default function MatchesPage() {
     return competitions.find((c) => c.id === id) ?? null;
   }
 
-  const filteredMatches =
-    competitionFilter === "all" ? matches : matches.filter((m) => m.competition_id === competitionFilter);
+  function season(id: number | null) {
+    return seasons.find((s) => s.id === id) ?? null;
+  }
+
+  const filteredMatches = matches.filter(
+    (m) =>
+      (competitionFilter === "all" || m.competition_id === competitionFilter) &&
+      (seasonFilter === "all" || m.season_id === seasonFilter),
+  );
+
+  function opponentHistory(match: Match) {
+    return matches
+      .filter(
+        (m) =>
+          m.id !== match.id &&
+          m.team_id === match.team_id &&
+          m.opponent_name.trim().toLowerCase() === match.opponent_name.trim().toLowerCase(),
+      )
+      .sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
+  }
 
   function renderMatch(match: Match) {
     if (editingId === match.id) {
@@ -257,6 +310,16 @@ export default function MatchesPage() {
                 .map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
+                  </option>
+                ))}
+            </select>
+            <select value={editSeasonId} onChange={(e) => setEditSeasonId(e.target.value)} className={input}>
+              <option value="">Sezon yok</option>
+              {seasons
+                .filter((s) => s.team_id === match.team_id)
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
                   </option>
                 ))}
             </select>
@@ -305,47 +368,81 @@ export default function MatchesPage() {
 
     const isCompleted = (match.status ?? "scheduled") === "completed" || match.status === "finished";
     const comp = competition(match.competition_id);
+    const seas = season(match.season_id);
+    const history = opponentHistory(match);
+    const historyOpen = expandedHistoryId === match.id;
     return (
-      <div key={match.id} className={`${card} flex items-center justify-between gap-3`}>
-        <div className="flex flex-col gap-1.5">
-          <span className="font-medium">
-            {teamName(match.team_id)} - {match.opponent_name}
-            {match.score_for != null && match.score_against != null && (
-              <span className="ml-2 text-foreground/60">
-                ({match.score_for}-{match.score_against})
+      <div key={match.id} className={`${card} flex flex-col gap-2`}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-1.5">
+            <span className="font-medium">
+              {teamName(match.team_id)} - {match.opponent_name}
+              {match.score_for != null && match.score_against != null && (
+                <span className="ml-2 text-foreground/60">
+                  ({match.score_for}-{match.score_against})
+                </span>
+              )}
+            </span>
+            <div className="flex flex-wrap items-center gap-2 text-sm text-foreground/50">
+              <span>
+                {new Date(match.match_date).toLocaleString("tr-TR")}
+                {match.location ? ` · ${match.location}` : ""}
+                {seas ? ` · ${seas.name}` : ""}
               </span>
-            )}
-          </span>
-          <div className="flex flex-wrap items-center gap-2 text-sm text-foreground/50">
-            <span>
-              {new Date(match.match_date).toLocaleString("tr-TR")}
-              {match.location ? ` · ${match.location}` : ""}
-            </span>
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                isCompleted ? "bg-accent/15 text-accent" : "bg-foreground/10 text-foreground/60"
-              }`}
-            >
-              {STATUS_LABELS[match.status ?? "scheduled"] ?? match.status}
-            </span>
-            {comp && (
               <span
-                className="rounded-full px-2.5 py-1 text-xs font-semibold text-white"
-                style={{ backgroundColor: comp.color ?? DEFAULT_COMPETITION_COLOR }}
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                  isCompleted ? "bg-accent/15 text-accent" : "bg-foreground/10 text-foreground/60"
+                }`}
               >
-                {comp.name}
+                {STATUS_LABELS[match.status ?? "scheduled"] ?? match.status}
               </span>
-            )}
+              {comp && (
+                <span
+                  className="rounded-full px-2.5 py-1 text-xs font-semibold text-white"
+                  style={{ backgroundColor: comp.color ?? DEFAULT_COMPETITION_COLOR }}
+                >
+                  {comp.name}
+                </span>
+              )}
+            </div>
           </div>
+          {canManageTeam(match.team_id) && (
+            <div className="flex items-center gap-3 shrink-0">
+              <button onClick={() => startEdit(match)} className="text-sm text-accent hover:underline">
+                Düzenle
+              </button>
+              <button onClick={() => handleDelete(match.id)} className={dangerLink}>
+                Sil
+              </button>
+            </div>
+          )}
         </div>
-        {canManageTeam(match.team_id) && (
-          <div className="flex items-center gap-3 shrink-0">
-            <button onClick={() => startEdit(match)} className="text-sm text-accent hover:underline">
-              Düzenle
+
+        {history.length > 0 && (
+          <div className="flex flex-col gap-1.5 border-t border-border pt-2">
+            <button
+              onClick={() => setExpandedHistoryId(historyOpen ? null : match.id)}
+              className="self-start text-xs font-medium text-foreground/50 hover:text-foreground transition-colors duration-300"
+            >
+              {historyOpen ? "Geçmiş Karşılaşmaları Gizle" : `Geçmiş Karşılaşmalar (${history.length})`}
             </button>
-            <button onClick={() => handleDelete(match.id)} className={dangerLink}>
-              Sil
-            </button>
+            {historyOpen && (
+              <ul className="flex flex-col gap-1 text-xs text-foreground/60">
+                {history.map((h) => (
+                  <li key={h.id} className="flex items-center gap-2">
+                    <span>{new Date(h.match_date).toLocaleDateString("tr-TR")}</span>
+                    <span>
+                      {h.score_for != null && h.score_against != null
+                        ? `${h.score_for}-${h.score_against}`
+                        : STATUS_LABELS[h.status ?? "scheduled"] ?? h.status}
+                    </span>
+                    {competition(h.competition_id) && (
+                      <span className="text-foreground/40">{competition(h.competition_id)?.name}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
       </div>
@@ -374,6 +471,7 @@ export default function MatchesPage() {
                 onChange={(e) => {
                   setTeamId(e.target.value);
                   setCompetitionId("");
+                  setSeasonId("");
                 }}
                 className={input}
               >
@@ -414,6 +512,16 @@ export default function MatchesPage() {
                 .map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
+                  </option>
+                ))}
+            </select>
+            <select value={seasonId} onChange={(e) => setSeasonId(e.target.value)} className={input}>
+              <option value="">Sezon yok</option>
+              {seasons
+                .filter((s) => teamId && s.team_id === Number(teamId))
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
                   </option>
                 ))}
             </select>
@@ -474,6 +582,49 @@ export default function MatchesPage() {
               </>
             )}
           </div>
+
+          <div className={`${card} flex flex-col gap-3`}>
+            <h2 className={sectionTitle}>Sezonlar</h2>
+            {!teamId ? (
+              <p className="text-sm text-foreground/50">Sezon eklemek için önce yukarıdan bir takım seçin.</p>
+            ) : (
+              <>
+                <div className="flex flex-wrap gap-2">
+                  {seasons
+                    .filter((s) => s.team_id === Number(teamId))
+                    .map((s) => (
+                      <span
+                        key={s.id}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-sm"
+                      >
+                        {s.name}
+                        <button
+                          onClick={() => handleDeleteSeason(s.id)}
+                          className="text-foreground/40 hover:text-red-500 transition-colors duration-300"
+                          aria-label={`${s.name} sil`}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  {seasons.filter((s) => s.team_id === Number(teamId)).length === 0 && (
+                    <span className="text-sm text-foreground/50">Henüz sezon eklenmedi.</span>
+                  )}
+                </div>
+                <form onSubmit={handleAddSeason} className="flex flex-wrap gap-2">
+                  <input
+                    value={newSeasonName}
+                    onChange={(e) => setNewSeasonName(e.target.value)}
+                    placeholder="Sezon adı (örn. 2026-2027)"
+                    className={`flex-1 min-w-[160px] ${input}`}
+                  />
+                  <button type="submit" className={secondaryButton}>
+                    Ekle
+                  </button>
+                </form>
+              </>
+            )}
+          </div>
         </>
       )}
 
@@ -494,13 +645,26 @@ export default function MatchesPage() {
         </div>
       )}
 
+      {seasons.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => setSeasonFilter("all")} className={chip(seasonFilter === "all")}>
+            Tüm Sezonlar
+          </button>
+          {seasons.map((s) => (
+            <button key={s.id} onClick={() => setSeasonFilter(s.id)} className={chip(seasonFilter === s.id)}>
+              {s.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       {loading ? (
         <p className="text-foreground/60">Yükleniyor...</p>
       ) : matches.length === 0 ? (
         <EmptyState icon={CalendarIcon} message="Henüz maç yok." />
       ) : filteredMatches.length === 0 ? (
-        <EmptyState icon={CalendarIcon} message="Bu lige/turnuvaya ait maç yok." />
+        <EmptyState icon={CalendarIcon} message="Bu filtreye uyan maç yok." />
       ) : view === "takvim" ? (
         <div className="flex flex-col gap-4">
           <MatchCalendar

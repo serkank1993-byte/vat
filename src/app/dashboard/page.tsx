@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import type { Match, MatchEvent, Player, Team } from "@/lib/types";
+import type { Competition, Match, MatchEvent, Player, Team } from "@/lib/types";
 import { card, input, sectionTitle } from "@/lib/ui";
 import PageHeading from "@/app/components/PageHeading";
 import { BarChartIcon } from "@/lib/icons";
@@ -13,17 +13,20 @@ export default function DashboardPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [events, setEvents] = useState<MatchEvent[]>([]);
+  const [competitions, setCompetitions] = useState<Competition[]>([]);
   const [matchId, setMatchId] = useState("");
+  const [competitionId, setCompetitionId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   async function loadData() {
     setLoading(true);
-    const [teamsRes, playersRes, matchesRes, eventsRes] = await Promise.all([
+    const [teamsRes, playersRes, matchesRes, eventsRes, competitionsRes] = await Promise.all([
       supabase.from("teams").select("*"),
       supabase.from("players").select("*"),
       supabase.from("matches").select("*").order("match_date", { ascending: false }),
       supabase.from("events").select("*"),
+      supabase.from("competitions").select("*").order("name"),
     ]);
     if (teamsRes.error) setError(teamsRes.error.message);
     else setTeams(teamsRes.data ?? []);
@@ -31,6 +34,7 @@ export default function DashboardPage() {
     if (matchesRes.data) setMatches(matchesRes.data);
     if (eventsRes.error) setError(eventsRes.error.message);
     else setEvents(eventsRes.data ?? []);
+    if (competitionsRes.data) setCompetitions(competitionsRes.data);
     setLoading(false);
   }
 
@@ -49,15 +53,16 @@ export default function DashboardPage() {
     return teams.find((t) => t.id === id)?.name ?? "—";
   }
 
-  const filteredEvents = useMemo(() => {
-    if (!matchId) return events;
-    return events.filter((e) => e.match_id === Number(matchId));
-  }, [events, matchId]);
-
   const filteredMatches = useMemo(() => {
-    if (!matchId) return matches;
-    return matches.filter((m) => m.id === Number(matchId));
-  }, [matches, matchId]);
+    if (matchId) return matches.filter((m) => m.id === Number(matchId));
+    if (competitionId) return matches.filter((m) => m.competition_id === Number(competitionId));
+    return matches;
+  }, [matches, matchId, competitionId]);
+
+  const filteredEvents = useMemo(() => {
+    const matchIds = new Set(filteredMatches.map((m) => m.id));
+    return events.filter((e) => e.match_id != null && matchIds.has(e.match_id));
+  }, [events, filteredMatches]);
 
   const teamRecords = useMemo(() => {
     return teams.map((team) => {
@@ -203,14 +208,31 @@ export default function DashboardPage() {
         Bu sayfa, Canlı Takip ve Video Analiz sayfalarında kaydedilen olaylardan otomatik hesaplanır.
       </p>
 
-      <select value={matchId} onChange={(e) => setMatchId(e.target.value)} className={`self-start ${input}`}>
-        <option value="">Tüm maçlar (kümüle)</option>
-        {matches.map((m) => (
-          <option key={m.id} value={m.id}>
-            {teamName(m.team_id)} - {m.opponent_name} ({new Date(m.match_date).toLocaleDateString("tr-TR")})
-          </option>
-        ))}
-      </select>
+      <div className="flex flex-wrap gap-2">
+        <select value={matchId} onChange={(e) => setMatchId(e.target.value)} className={input}>
+          <option value="">Tüm maçlar (kümüle)</option>
+          {matches.map((m) => (
+            <option key={m.id} value={m.id}>
+              {teamName(m.team_id)} - {m.opponent_name} ({new Date(m.match_date).toLocaleDateString("tr-TR")})
+            </option>
+          ))}
+        </select>
+        {competitions.length > 0 && (
+          <select
+            value={competitionId}
+            onChange={(e) => setCompetitionId(e.target.value)}
+            disabled={!!matchId}
+            className={input}
+          >
+            <option value="">Tüm ligler</option>
+            {competitions.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatTile label="Toplam Maç" value={filteredMatches.length} />
