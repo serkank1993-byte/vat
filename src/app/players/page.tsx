@@ -50,6 +50,8 @@ export default function PlayersPage() {
   const [positionFilter, setPositionFilter] = useState("");
   const [inviteLinks, setInviteLinks] = useState<Record<number, string>>({});
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [bulkGenerating, setBulkGenerating] = useState(false);
+  const [copiedAll, setCopiedAll] = useState(false);
 
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [detailName, setDetailName] = useState("");
@@ -167,6 +169,53 @@ export default function PlayersPage() {
     setTimeout(() => setCopiedId(null), 2000);
   }
 
+  async function handleGenerateAllInvites(eligiblePlayers: Player[]) {
+    setBulkGenerating(true);
+    setError(null);
+
+    const updatedTokens: Record<number, string> = {};
+    const toCreate = eligiblePlayers.filter((p) => !p.invite_token);
+
+    if (toCreate.length > 0) {
+      const results = await Promise.all(
+        toCreate.map(async (p) => {
+          const token = crypto.randomUUID();
+          const { error } = await supabase.from("players").update({ invite_token: token }).eq("id", p.id);
+          return { id: p.id, token, error };
+        }),
+      );
+      const failed = results.find((r) => r.error);
+      if (failed?.error) {
+        setError(failed.error.message);
+        setBulkGenerating(false);
+        return;
+      }
+      for (const r of results) updatedTokens[r.id] = r.token;
+      setPlayers((prev) => prev.map((p) => (updatedTokens[p.id] ? { ...p, invite_token: updatedTokens[p.id] } : p)));
+    }
+
+    setInviteLinks((prev) => {
+      const next = { ...prev };
+      for (const p of eligiblePlayers) {
+        const token = updatedTokens[p.id] ?? p.invite_token;
+        if (token) next[p.id] = `${window.location.origin}/kayit?token=${token}`;
+      }
+      return next;
+    });
+
+    setBulkGenerating(false);
+  }
+
+  async function handleCopyAllInvites(eligiblePlayers: Player[]) {
+    const lines = eligiblePlayers
+      .filter((p) => inviteLinks[p.id])
+      .map((p) => `#${p.jersey_number} ${p.name}: ${inviteLinks[p.id]}`);
+    if (lines.length === 0) return;
+    await navigator.clipboard.writeText(lines.join("\n"));
+    setCopiedAll(true);
+    setTimeout(() => setCopiedAll(false), 2000);
+  }
+
   function teamName(id: number | null) {
     return teams.find((t) => t.id === id)?.name ?? "—";
   }
@@ -278,6 +327,8 @@ export default function PlayersPage() {
     return matchesQuery && matchesPosition;
   });
 
+  const eligibleForInvite = filteredPlayers.filter((p) => !p.user_id && canManageTeam(p.team_id));
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeading icon={UserIcon} title="Oyuncular" />
@@ -339,6 +390,26 @@ export default function PlayersPage() {
               </option>
             ))}
           </select>
+        </div>
+      )}
+
+      {!roleLoading && (isAdmin || myPlayer?.role === "captain") && eligibleForInvite.length > 0 && (
+        <div className={`${card} flex flex-wrap items-center gap-3`}>
+          <span className="text-sm text-foreground/70">
+            {eligibleForInvite.length} oyuncu için davet linki oluşturulabilir.
+          </span>
+          <button
+            onClick={() => handleGenerateAllInvites(eligibleForInvite)}
+            disabled={bulkGenerating}
+            className={secondaryButton}
+          >
+            {bulkGenerating ? "Oluşturuluyor..." : "Tüm Davetleri Oluştur"}
+          </button>
+          {eligibleForInvite.some((p) => inviteLinks[p.id]) && (
+            <button onClick={() => handleCopyAllInvites(eligibleForInvite)} className={secondaryButton}>
+              {copiedAll ? "Kopyalandı" : "Tümünü Kopyala"}
+            </button>
+          )}
         </div>
       )}
 
