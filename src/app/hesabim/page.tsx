@@ -34,11 +34,27 @@ function AccountPageContent() {
   async function loadPlayer(userId: string) {
     setLoading(true);
 
-    const pendingToken = searchParams.get("invite_token") || localStorage.getItem(PENDING_TOKEN_KEY);
+    const urlToken = searchParams.get("invite_token");
+    const pendingToken = urlToken || localStorage.getItem(PENDING_TOKEN_KEY);
     if (pendingToken) {
-      await supabase.rpc("claim_player_invite", { p_token: pendingToken });
-      localStorage.removeItem(PENDING_TOKEN_KEY);
-      if (searchParams.get("invite_token")) router.replace("/hesabim");
+      const { error: claimError } = await supabase.rpc("claim_player_invite", { p_token: pendingToken });
+      if (claimError) {
+        // "Invalid or already used invite token" is expected if an earlier call
+        // already claimed it (e.g. a double-invocation) — safe to clear then.
+        // Any other error is a genuine failure, so keep the token around for retry
+        // instead of silently orphaning the invite.
+        if (claimError.message.toLowerCase().includes("invalid or already used")) {
+          localStorage.removeItem(PENDING_TOKEN_KEY);
+          if (urlToken) router.replace("/hesabim");
+        } else {
+          setError(
+            `Davet bağlama işlemi başarısız oldu: ${claimError.message}. Sayfayı yenileyerek tekrar deneyebilirsin.`,
+          );
+        }
+      } else {
+        localStorage.removeItem(PENDING_TOKEN_KEY);
+        if (urlToken) router.replace("/hesabim");
+      }
     }
 
     const { data: adminData } = await supabase.rpc("is_admin");
