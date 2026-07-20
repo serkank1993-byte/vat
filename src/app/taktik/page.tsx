@@ -203,7 +203,9 @@ export default function TacticsPage() {
   function handleFormationChange(name: string) {
     setFormation(name);
     const presetSlots = FORMATIONS[name];
-    setStartingSlots((prev) => presetSlots.map((preset, i) => ({ playerId: prev[i]?.playerId ?? null, ...preset })));
+    setStartingSlots((prev) =>
+      presetSlots.map((preset, i) => ({ playerId: prev[i]?.playerId ?? null, x: preset.x, y: preset.y })),
+    );
     setSaved(false);
   }
 
@@ -515,7 +517,9 @@ export default function TacticsPage() {
                   <h2 className={sectionTitle}>Kadro Yerleşimi</h2>
                   {startingSlots.map((slot, i) => (
                     <label key={i} className="flex items-center gap-2 text-sm">
-                      <span className="w-14 shrink-0 text-foreground/50">Slot {i + 1}</span>
+                      <span className="w-28 shrink-0 text-foreground/50">
+                        {(FORMATIONS[formation] ?? [])[i]?.label ?? `Slot ${i + 1}`}
+                      </span>
                       <select
                         value={slot.playerId ?? ""}
                         onChange={(e) => handleAssignSlot(i, e.target.value ? Number(e.target.value) : null)}
