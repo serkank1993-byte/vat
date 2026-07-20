@@ -13,6 +13,35 @@ export function pushSupported() {
   return typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
 }
 
+/**
+ * Takımın bildirim açmış oyuncularına push bildirimi gönderir.
+ * Yalnızca ilgili takımın kaptanı/yöneticisi çağırabilir (yetki sunucuda kontrol edilir).
+ * Sessizce başarısız olabilir (ör. hiç abone yoksa) — hata döndürür ama akışı bozmaz.
+ */
+export async function notifyTeam(
+  teamId: number,
+  title: string,
+  body: string,
+  url = "/",
+): Promise<{ ok: boolean; sent?: number; error?: string }> {
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) return { ok: false, error: "Oturum yok." };
+    const res = await fetch("/api/send-team-notification", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ teamId, title, body, url }),
+    });
+    const payload = await res.json().catch(() => null);
+    if (!res.ok) return { ok: false, error: payload?.error ?? `Hata ${res.status}` };
+    return { ok: true, sent: payload?.sent ?? 0 };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 export async function getPushSubscriptionState(): Promise<"subscribed" | "unsubscribed" | "unsupported"> {
   if (!pushSupported()) return "unsupported";
   const registration = await navigator.serviceWorker.ready;

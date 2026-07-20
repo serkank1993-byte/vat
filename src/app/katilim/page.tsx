@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/useSession";
+import { notifyTeam } from "@/lib/push";
 import type { AttendanceStatus, Match, MatchAttendance, MatchVote, Player, Team } from "@/lib/types";
 import { card, chip, input, secondaryButton, sectionTitle } from "@/lib/ui";
 import PageHeading from "@/app/components/PageHeading";
@@ -119,6 +120,8 @@ export default function AttendancePage() {
   );
 
   const [copiedReminder, setCopiedReminder] = useState(false);
+  const [sendingReminder, setSendingReminder] = useState(false);
+  const [reminderInfo, setReminderInfo] = useState<string | null>(null);
 
   async function handleCopyReminder() {
     if (!selectedMatch || nonResponders.length === 0) return;
@@ -128,6 +131,22 @@ export default function AttendancePage() {
     await navigator.clipboard.writeText(message);
     setCopiedReminder(true);
     setTimeout(() => setCopiedReminder(false), 2000);
+  }
+
+  async function handleSendReminderPush() {
+    if (!selectedMatch || selectedMatch.team_id == null) return;
+    setSendingReminder(true);
+    setReminderInfo(null);
+    const dateLabel = new Date(selectedMatch.match_date).toLocaleDateString("tr-TR");
+    const result = await notifyTeam(
+      selectedMatch.team_id,
+      "Katılım Hatırlatması",
+      `${selectedMatch.opponent_name} (${dateLabel}) maçı için katılım durumunu bildir.`,
+      "/katilim",
+    );
+    setSendingReminder(false);
+    if (result.ok) setReminderInfo(`Bildirim gönderildi: ${result.sent ?? 0} oyuncu.`);
+    else setError(result.error ?? "Bildirim gönderilemedi.");
   }
 
   const myVote = votes.find((v) => v.voter_player_id === ownPlayerId) ?? null;
@@ -295,9 +314,15 @@ export default function AttendancePage() {
                   </span>
                 ))}
               </div>
-              <button onClick={handleCopyReminder} className={`self-start ${secondaryButton}`}>
-                {copiedReminder ? "Kopyalandı" : "Hatırlatma Metnini Kopyala"}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={handleCopyReminder} className={secondaryButton}>
+                  {copiedReminder ? "Kopyalandı" : "Hatırlatma Metnini Kopyala"}
+                </button>
+                <button onClick={handleSendReminderPush} disabled={sendingReminder} className={secondaryButton}>
+                  {sendingReminder ? "Gönderiliyor..." : "Bildirim Gönder"}
+                </button>
+              </div>
+              {reminderInfo && <p className="text-sm text-accent">{reminderInfo}</p>}
             </div>
           )}
 

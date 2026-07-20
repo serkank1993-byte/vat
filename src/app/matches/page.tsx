@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/useSession";
+import { notifyTeam } from "@/lib/push";
 import type { Competition, Match, Player, Season, Team } from "@/lib/types";
 import { card, chip, dangerLink, input, primaryButton, secondaryButton, sectionTitle } from "@/lib/ui";
 import PageHeading from "@/app/components/PageHeading";
@@ -137,6 +138,15 @@ export default function MatchesPage() {
     });
     if (error) setError(error.message);
     else {
+      if (teamId) {
+        const dateLabel = new Date(matchDate).toLocaleDateString("tr-TR");
+        notifyTeam(
+          Number(teamId),
+          "Yeni Maç Eklendi",
+          `${opponentName} maçı — ${dateLabel}${location ? ` • ${location}` : ""}`,
+          "/matches",
+        );
+      }
       setOpponentName("");
       setMatchDate("");
       setLocation("");
@@ -192,6 +202,20 @@ export default function MatchesPage() {
     setSavingEdit(false);
     if (error) setError(error.message);
     else {
+      // Maç ilk kez "tamamlandı" olarak skorla kaydedildiğinde sonucu bildir.
+      const becameCompleted =
+        editStatus === "completed" &&
+        match.status !== "completed" &&
+        editScoreFor !== "" &&
+        editScoreAgainst !== "";
+      if (becameCompleted && match.team_id) {
+        notifyTeam(
+          match.team_id,
+          "Maç Sonucu",
+          `${teamName(match.team_id)} ${editScoreFor}-${editScoreAgainst} ${editOpponentName}`,
+          "/matches",
+        );
+      }
       setEditingId(null);
       loadData();
     }
