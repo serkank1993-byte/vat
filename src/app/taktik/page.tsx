@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/useSession";
 import type { Match, MatchAttendance, MatchTacticPosition, Player, TacticsContext, Team } from "@/lib/types";
 import { DEFAULT_FORMATION, FORMATIONS, FORMATION_NAMES } from "@/lib/formations";
+import { buildLineupSvg, shareOrDownloadPng, svgToPngBlob } from "@/lib/lineupImage";
 import { card, chip, dangerLink, input, primaryButton, secondaryButton, sectionTitle } from "@/lib/ui";
 import PitchDiagram from "@/app/components/PitchDiagram";
 import PageHeading from "@/app/components/PageHeading";
@@ -51,6 +52,7 @@ export default function TacticsPage() {
   const [announcing, setAnnouncing] = useState(false);
   const [announceInfo, setAnnounceInfo] = useState<string | null>(null);
   const [rosterOpen, setRosterOpen] = useState(true);
+  const [sharingLineup, setSharingLineup] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -444,6 +446,47 @@ export default function TacticsPage() {
     setAnnouncing(false);
   }
 
+  async function handleShareLineup() {
+    if (!selectedMatch) return;
+    const presetSlots = FORMATIONS[formation] ?? [];
+    const slots = startingSlots
+      .map((slot, i) => {
+        if (slot.playerId == null) return null;
+        const p = roster.find((r) => r.id === slot.playerId);
+        if (!p) return null;
+        return {
+          label: presetSlots[i]?.label ?? `Slot ${i + 1}`,
+          playerName: p.name,
+          jerseyNumber: p.jersey_number,
+          x: slot.x,
+          y: slot.y,
+        };
+      })
+      .filter((s): s is NonNullable<typeof s> => s != null);
+    if (slots.length === 0) {
+      setError("Paylaşmak için en az bir oyuncu yerleştirin.");
+      return;
+    }
+    setSharingLineup(true);
+    setError(null);
+    try {
+      const team = teams.find((t) => t.id === selectedMatch.team_id);
+      const dateLabel = new Date(selectedMatch.match_date).toLocaleDateString("tr-TR");
+      const svg = buildLineupSvg({
+        title: `${teamName(selectedMatch.team_id)} — İlk 11`,
+        subtitle: `${selectedMatch.opponent_name} • ${dateLabel}`,
+        formation,
+        slots,
+        markerColor: team?.primary_color || "#1e293b",
+      });
+      const blob = await svgToPngBlob(svg, 660, 920);
+      await shareOrDownloadPng(blob, "ilk11.png");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Görsel oluşturulamadı.");
+    }
+    setSharingLineup(false);
+  }
+
   const assignedPlayerIds = new Set(
     startingSlots.map((s) => s.playerId).filter((id): id is number => id != null),
   );
@@ -603,6 +646,13 @@ export default function TacticsPage() {
                 <p className="text-xs text-foreground/50">
                   Bir oyuncuyu sahada sürükleyerek tam konumunu ayarlayabilirsiniz.
                 </p>
+                <button
+                  onClick={handleShareLineup}
+                  disabled={sharingLineup || assignedPlayerIds.size === 0}
+                  className={secondaryButton}
+                >
+                  {sharingLineup ? "Hazırlanıyor..." : "İlk 11'i Görsel Olarak Paylaş"}
+                </button>
               </div>
               <div className={`w-full mx-auto lg:mx-0 ${isFullscreen ? "max-w-2xl" : "max-w-md"}`}>
                 <PitchDiagram>
