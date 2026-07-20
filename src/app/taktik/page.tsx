@@ -357,7 +357,9 @@ export default function TacticsPage() {
       if (!res.ok) {
         setError(`Bildirim gönderilemedi (${res.status}): ${payload?.error ?? "bilinmeyen hata"}`);
       } else {
-        setAnnounceInfo(`Bildirim gönderildi: ${payload?.sent ?? 0}/${payload?.total ?? 0} oyuncu.`);
+        const errorDetail =
+          payload?.sendErrors?.length > 0 ? ` (hatalar: ${payload.sendErrors.join(" | ")})` : "";
+        setAnnounceInfo(`Bildirim gönderildi: ${payload?.sent ?? 0}/${payload?.total ?? 0} oyuncu.${errorDetail}`);
       }
     } catch (err) {
       setError(`Bildirim isteği gönderilemedi: ${err instanceof Error ? err.message : String(err)}`);
