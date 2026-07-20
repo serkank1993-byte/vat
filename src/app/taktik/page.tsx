@@ -46,6 +46,9 @@ export default function TacticsPage() {
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [isAnnounced, setIsAnnounced] = useState(false);
+  const [announcedAt, setAnnouncedAt] = useState<string | null>(null);
+  const [announcing, setAnnouncing] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -143,6 +146,8 @@ export default function TacticsPage() {
 
     const loadedFormation = formationRes.data?.formation ?? DEFAULT_FORMATION;
     setFormation(loadedFormation);
+    setIsAnnounced(formationRes.data?.is_announced ?? false);
+    setAnnouncedAt(formationRes.data?.announced_at ?? null);
 
     const allTactics: MatchTacticPosition[] = tacticsRes.data ?? [];
     const presetSlots = FORMATIONS[loadedFormation] ?? FORMATIONS[DEFAULT_FORMATION];
@@ -333,6 +338,47 @@ export default function TacticsPage() {
     setSaved(true);
   }
 
+  async function handleAnnounce() {
+    if (!selectedMatch) return;
+    setAnnouncing(true);
+    setError(null);
+    const now = new Date().toISOString();
+    const { error: announceError } = await supabase.from("match_formations").upsert({
+      match_id: selectedMatch.id,
+      formation,
+      updated_at: now,
+      is_announced: true,
+      announced_at: now,
+    });
+    if (announceError) {
+      setError(announceError.message);
+      setAnnouncing(false);
+      return;
+    }
+    setIsAnnounced(true);
+    setAnnouncedAt(now);
+
+    const {
+      data: { session: activeSession },
+    } = await supabase.auth.getSession();
+    if (activeSession) {
+      try {
+        await fetch("/api/send-tactic-notification", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${activeSession.access_token}`,
+          },
+          body: JSON.stringify({ matchId: selectedMatch.id }),
+        });
+      } catch {
+        // Bildirim gönderimi başarısız olsa bile duyuru işlemi tamamlanmış sayılır —
+        // oyuncular sayfayı açtıklarında taktiği zaten görebilecekler.
+      }
+    }
+    setAnnouncing(false);
+  }
+
   const assignedPlayerIds = new Set(
     startingSlots.map((s) => s.playerId).filter((id): id is number => id != null),
   );
@@ -399,6 +445,27 @@ export default function TacticsPage() {
             <p className="text-sm text-foreground/50">
               Bu maçın taktiğini yalnızca takımın kaptanı veya yönetici düzenleyebilir. Salt okunur görüntülüyorsunuz.
             </p>
+          )}
+
+          {canEdit && (
+            <div
+              className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm ${
+                isAnnounced
+                  ? "border-accent/30 bg-accent/10 text-accent"
+                  : "border-border bg-foreground/5 text-foreground/70"
+              }`}
+            >
+              <span>
+                {isAnnounced
+                  ? `Duyuruldu${announcedAt ? ` • ${new Date(announcedAt).toLocaleString("tr-TR")}` : ""}`
+                  : "Bu taktik henüz duyurulmadı — yalnızca siz görebilirsiniz."}
+              </span>
+              {!isAnnounced && (
+                <button onClick={handleAnnounce} disabled={announcing} className={primaryButton}>
+                  {announcing ? "Duyuruluyor..." : "Oyunculara Duyur"}
+                </button>
+              )}
+            </div>
           )}
 
           {tab === "starting" ? (

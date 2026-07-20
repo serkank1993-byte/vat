@@ -5,6 +5,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/useSession";
+import { getPushSubscriptionState, pushSupported, subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 import type { MatchAttendance, MatchEvent, Player } from "@/lib/types";
 import { card, dangerLink, input, primaryButton, secondaryButton, sectionTitle } from "@/lib/ui";
 import StatTile from "@/app/components/StatTile";
@@ -30,6 +31,33 @@ function AccountPageContent() {
   const [position, setPosition] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  const [pushState, setPushState] = useState<"subscribed" | "unsubscribed" | "unsupported" | "loading">("loading");
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!pushSupported()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPushState("unsupported");
+      return;
+    }
+    getPushSubscriptionState().then(setPushState);
+  }, []);
+
+  async function handleTogglePush() {
+    setPushBusy(true);
+    setPushError(null);
+    if (pushState === "subscribed") {
+      await unsubscribeFromPush();
+      setPushState("unsubscribed");
+    } else {
+      const result = await subscribeToPush();
+      if (result.ok) setPushState("subscribed");
+      else setPushError(result.error ?? "Bildirimler açılamadı.");
+    }
+    setPushBusy(false);
+  }
 
   async function loadPlayer(userId: string) {
     setLoading(true);
@@ -206,6 +234,29 @@ function AccountPageContent() {
           </div>
         </form>
       </section>
+
+      {pushState !== "unsupported" && (
+        <section className="flex flex-col gap-3">
+          <h2 className={sectionTitle}>Bildirimler</h2>
+          <div className={`${card} flex flex-wrap items-center justify-between gap-3 max-w-sm`}>
+            <p className="text-sm text-foreground/70">
+              Kaptanın taktik duyurduğunda telefonuna bildirim gitsin.
+            </p>
+            <button
+              onClick={handleTogglePush}
+              disabled={pushBusy || pushState === "loading"}
+              className={pushState === "subscribed" ? secondaryButton : primaryButton}
+            >
+              {pushState === "loading"
+                ? "Yükleniyor..."
+                : pushState === "subscribed"
+                  ? "Bildirimleri Kapat"
+                  : "Bildirimleri Aç"}
+            </button>
+          </div>
+          {pushError && <p className="text-sm text-red-600 dark:text-red-400">{pushError}</p>}
+        </section>
+      )}
 
       <section className="flex flex-col gap-3">
         <h2 className={sectionTitle}>İstatistiklerim</h2>

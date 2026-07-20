@@ -97,6 +97,8 @@ export type MatchFormation = {
   match_id: number;
   formation: string;
   updated_at: string;
+  is_announced: boolean;
+  announced_at: string | null;
 };
 
 export type MatchTacticPosition = {
