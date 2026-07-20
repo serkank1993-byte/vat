@@ -4,11 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/useSession";
-import type { AttendanceStatus, Match, MatchAttendance, Player, Team } from "@/lib/types";
+import type { AttendanceStatus, Match, MatchAttendance, MatchVote, Player, Team } from "@/lib/types";
 import { card, chip, input, secondaryButton, sectionTitle } from "@/lib/ui";
 import PageHeading from "@/app/components/PageHeading";
 import EmptyState from "@/app/components/EmptyState";
-import { CheckCircleIcon, MinusCircleIcon, UserIcon, XCircleIcon } from "@/lib/icons";
+import { CheckCircleIcon, MinusCircleIcon, ShieldIcon, UserIcon, XCircleIcon } from "@/lib/icons";
 
 const STATUS_OPTIONS: { value: AttendanceStatus; label: string }[] = [
   { value: "geliyor", label: "Geliyorum" },
@@ -31,6 +31,7 @@ export default function AttendancePage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [attendance, setAttendance] = useState<MatchAttendance[]>([]);
+  const [votes, setVotes] = useState<MatchVote[]>([]);
   const [matchId, setMatchId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -67,14 +68,17 @@ export default function AttendancePage() {
   async function loadAttendance(forMatchId: string) {
     if (!forMatchId) {
       setAttendance([]);
+      setVotes([]);
       return;
     }
-    const { data, error } = await supabase
-      .from("match_attendance")
-      .select("*")
-      .eq("match_id", Number(forMatchId));
-    if (error) setError(error.message);
-    else setAttendance(data ?? []);
+    const [attRes, votesRes] = await Promise.all([
+      supabase.from("match_attendance").select("*").eq("match_id", Number(forMatchId)),
+      supabase.from("match_votes").select("*").eq("match_id", Number(forMatchId)),
+    ]);
+    if (attRes.error) setError(attRes.error.message);
+    else setAttendance(attRes.data ?? []);
+    if (votesRes.error) setError(votesRes.error.message);
+    else setVotes(votesRes.data ?? []);
   }
 
   function handleSelectMatch(id: string) {
@@ -124,6 +128,48 @@ export default function AttendancePage() {
     await navigator.clipboard.writeText(message);
     setCopiedReminder(true);
     setTimeout(() => setCopiedReminder(false), 2000);
+  }
+
+  const myVote = votes.find((v) => v.voter_player_id === ownPlayerId) ?? null;
+
+  // Maçın adamı: her oyuncunun aldığı oy sayısı, çoktan aza sıralı.
+  const voteTally = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const v of votes) counts.set(v.voted_player_id, (counts.get(v.voted_player_id) ?? 0) + 1);
+    return rosterForSelectedMatch
+      .map((p) => ({ player: p, count: counts.get(p.id) ?? 0 }))
+      .filter((r) => r.count > 0)
+      .sort((a, b) => b.count - a.count);
+  }, [votes, rosterForSelectedMatch]);
+
+  const topVotes = voteTally[0]?.count ?? 0;
+
+  async function handleVote(votedPlayerId: number) {
+    if (!selectedMatch || ownPlayerId == null) return;
+    // İyimser güncelleme
+    setVotes((prev) => {
+      const rest = prev.filter((v) => v.voter_player_id !== ownPlayerId);
+      return [
+        ...rest,
+        {
+          id: myVote?.id ?? -Date.now(),
+          match_id: selectedMatch.id,
+          voter_player_id: ownPlayerId,
+          voted_player_id: votedPlayerId,
+          created_at: new Date().toISOString(),
+        },
+      ];
+    });
+    const { error } = await supabase
+      .from("match_votes")
+      .upsert(
+        { match_id: selectedMatch.id, voter_player_id: ownPlayerId, voted_player_id: votedPlayerId },
+        { onConflict: "match_id,voter_player_id" },
+      );
+    if (error) {
+      setError(error.message);
+      loadAttendance(matchId);
+    }
   }
 
   async function setStatus(playerId: number, status: AttendanceStatus) {
@@ -298,6 +344,62 @@ export default function AttendancePage() {
                   );
                 })}
               </ul>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <h2 className={sectionTitle}>Maçın Adamı</h2>
+            {ownPlayerId != null && myPlayer?.team_id === selectedMatch.team_id ? (
+              <div className={`${card} flex flex-col gap-3`}>
+                <p className="text-sm text-foreground/60">
+                  Bu maçta en beğendiğin takım arkadaşını seç.
+                  {myVote && (
+                    <>
+                      {" "}
+                      Oyun:{" "}
+                      <span className="font-medium text-accent">
+                        {rosterForSelectedMatch.find((p) => p.id === myVote.voted_player_id)?.name ?? "—"}
+                      </span>
+                    </>
+                  )}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {rosterForSelectedMatch
+                    .filter((p) => p.id !== ownPlayerId)
+                    .map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => handleVote(p.id)}
+                        className={`${chip(myVote?.voted_player_id === p.id)} py-1.5 px-3 text-sm`}
+                      >
+                        #{p.jersey_number} {p.name}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-foreground/50">
+                Oy verebilmek için bu takımın oyuncusu olarak giriş yapmalısın.
+              </p>
+            )}
+
+            {voteTally.length > 0 && (
+              <div className={`${card} flex flex-col gap-2`}>
+                <h3 className="text-sm font-semibold text-foreground/70">Oy Durumu</h3>
+                <ul className="flex flex-col gap-2">
+                  {voteTally.map(({ player, count }) => (
+                    <li key={player.id} className="flex items-center gap-3">
+                      {count === topVotes && (
+                        <ShieldIcon className="h-4 w-4 shrink-0 text-accent" />
+                      )}
+                      <span className={`flex-1 text-sm ${count === topVotes ? "font-semibold" : ""}`}>
+                        #{player.jersey_number} {player.name}
+                      </span>
+                      <span className="text-sm tabular-nums text-foreground/60">{count} oy</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         </>

@@ -91,6 +91,14 @@ export type MatchAttendance = {
   created_at: string;
 };
 
+export type MatchVote = {
+  id: number;
+  match_id: number;
+  voter_player_id: number;
+  voted_player_id: number;
+  created_at: string;
+};
+
 export type TacticsContext = "starting" | "set_piece_attack" | "set_piece_defense";
 
 export type MatchFormation = {

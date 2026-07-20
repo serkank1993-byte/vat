@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import type { Competition, Match, MatchEvent, Player, Team } from "@/lib/types";
+import type { Competition, Match, MatchEvent, MatchVote, Player, Team } from "@/lib/types";
 import { card, input, sectionTitle } from "@/lib/ui";
 import PageHeading from "@/app/components/PageHeading";
 import { BarChartIcon } from "@/lib/icons";
@@ -13,6 +13,7 @@ export default function DashboardPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [events, setEvents] = useState<MatchEvent[]>([]);
+  const [votes, setVotes] = useState<MatchVote[]>([]);
   const [competitions, setCompetitions] = useState<Competition[]>([]);
   const [matchId, setMatchId] = useState("");
   const [competitionId, setCompetitionId] = useState("");
@@ -21,12 +22,13 @@ export default function DashboardPage() {
 
   async function loadData() {
     setLoading(true);
-    const [teamsRes, playersRes, matchesRes, eventsRes, competitionsRes] = await Promise.all([
+    const [teamsRes, playersRes, matchesRes, eventsRes, competitionsRes, votesRes] = await Promise.all([
       supabase.from("teams").select("*"),
       supabase.from("players").select("*"),
       supabase.from("matches").select("*").order("match_date", { ascending: false }),
       supabase.from("events").select("*"),
       supabase.from("competitions").select("*").order("name"),
+      supabase.from("match_votes").select("*"),
     ]);
     if (teamsRes.error) setError(teamsRes.error.message);
     else setTeams(teamsRes.data ?? []);
@@ -35,6 +37,7 @@ export default function DashboardPage() {
     if (eventsRes.error) setError(eventsRes.error.message);
     else setEvents(eventsRes.data ?? []);
     if (competitionsRes.data) setCompetitions(competitionsRes.data);
+    if (votesRes.data) setVotes(votesRes.data);
     setLoading(false);
   }
 
@@ -58,6 +61,20 @@ export default function DashboardPage() {
     if (competitionId) return matches.filter((m) => m.competition_id === Number(competitionId));
     return matches;
   }, [matches, matchId, competitionId]);
+
+  // Maçın adamı: seçili maçlar içinde her oyuncunun aldığı toplam oy.
+  const motmLeaders = useMemo(() => {
+    const matchIds = new Set(filteredMatches.map((m) => m.id));
+    const counts = new Map<number, number>();
+    for (const v of votes) {
+      if (!matchIds.has(v.match_id)) continue;
+      counts.set(v.voted_player_id, (counts.get(v.voted_player_id) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([playerId, count]) => ({ playerId, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [votes, filteredMatches]);
 
   const filteredEvents = useMemo(() => {
     const matchIds = new Set(filteredMatches.map((m) => m.id));
@@ -307,6 +324,11 @@ export default function DashboardPage() {
             value: `%${p.accuracy.toFixed(0)}`,
             hint: `${p.attempted} şut`,
           }))}
+        />
+        <Leaderboard
+          title="Maçın Adamı"
+          empty="Henüz oy verilmedi."
+          rows={motmLeaders.map((m) => ({ label: playerLabel(m.playerId), value: `${m.count} oy` }))}
         />
       </div>
 
