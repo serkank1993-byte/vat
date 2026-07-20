@@ -152,15 +152,50 @@ export default function TacticsPage() {
 
     const allTactics: MatchTacticPosition[] = tacticsRes.data ?? [];
     const presetSlots = FORMATIONS[loadedFormation] ?? FORMATIONS[DEFAULT_FORMATION];
-    const startingRows = allTactics
-      .filter((r) => r.context === "starting")
-      .sort((a, b) => a.player_id - b.player_id);
-    const newStartingSlots: StartingSlot[] = presetSlots.map((preset, i) => {
-      const row = startingRows[i];
-      return row
-        ? { playerId: row.player_id, x: Number(row.pos_x), y: Number(row.pos_y) }
-        : { playerId: null, x: preset.x, y: preset.y };
-    });
+    const startingRows = allTactics.filter((r) => r.context === "starting");
+
+    // Boş slotlarla başla; kaydedilmiş satırları doğru slota yerleştir.
+    const newStartingSlots: StartingSlot[] = presetSlots.map((preset) => ({
+      playerId: null,
+      x: preset.x,
+      y: preset.y,
+    }));
+
+    // Önce slot_index'i olan (yeni) kayıtları kesin konumlarına koy.
+    const legacyRows: MatchTacticPosition[] = [];
+    for (const row of startingRows) {
+      if (row.slot_index != null && row.slot_index >= 0 && row.slot_index < newStartingSlots.length) {
+        newStartingSlots[row.slot_index] = {
+          playerId: row.player_id,
+          x: Number(row.pos_x),
+          y: Number(row.pos_y),
+        };
+      } else {
+        legacyRows.push(row);
+      }
+    }
+
+    // Eski kayıtlarda (slot_index yok) her oyuncuyu konumuna en yakın boş slota eşle.
+    for (const row of legacyRows) {
+      let bestIndex = -1;
+      let bestDist = Infinity;
+      newStartingSlots.forEach((slot, i) => {
+        if (slot.playerId != null) return;
+        const preset = presetSlots[i];
+        const dist = (preset.x - Number(row.pos_x)) ** 2 + (preset.y - Number(row.pos_y)) ** 2;
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestIndex = i;
+        }
+      });
+      if (bestIndex >= 0) {
+        newStartingSlots[bestIndex] = {
+          playerId: row.player_id,
+          x: Number(row.pos_x),
+          y: Number(row.pos_y),
+        };
+      }
+    }
     setStartingSlots(newStartingSlots);
 
     setSetPieceMarkers({
@@ -295,9 +330,16 @@ export default function TacticsPage() {
         return;
       }
       const rows = startingSlots
-        .map((slot) =>
+        .map((slot, i) =>
           slot.playerId != null
-            ? { match_id: selectedMatch.id, context: "starting", player_id: slot.playerId, pos_x: slot.x, pos_y: slot.y }
+            ? {
+                match_id: selectedMatch.id,
+                context: "starting",
+                player_id: slot.playerId,
+                pos_x: slot.x,
+                pos_y: slot.y,
+                slot_index: i,
+              }
             : null,
         )
         .filter((r): r is NonNullable<typeof r> => r != null);

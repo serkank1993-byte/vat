@@ -108,5 +108,6 @@ export type MatchTacticPosition = {
   player_id: number;
   pos_x: number;
   pos_y: number;
+  slot_index: number | null;
   created_at: string;
 };
