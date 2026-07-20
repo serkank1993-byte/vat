@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/useSession";
 import {
-  ActivityIcon,
   BallIcon,
   BarChartIcon,
   CalendarIcon,
@@ -27,7 +26,6 @@ const LINKS = [
   { href: "/matches", label: "Fikstür", icon: CalendarIcon },
   { href: "/katilim", label: "Katılım", icon: CheckCircleIcon },
   { href: "/taktik", label: "Taktik", icon: TacticsBoardIcon },
-  { href: "/live", label: "Canlı Takip", icon: ActivityIcon },
   { href: "/analysis", label: "Video Analiz", icon: PlayCircleIcon },
   { href: "/dashboard", label: "İstatistikler", icon: BarChartIcon },
   { href: "/hesabim", label: "Hesabım", icon: UserCircleIcon },

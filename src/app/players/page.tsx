@@ -11,28 +11,6 @@ import PageHeading from "@/app/components/PageHeading";
 import EmptyState from "@/app/components/EmptyState";
 import { UserIcon } from "@/lib/icons";
 
-function fileToBase64(file: File): Promise<{ base64: string; mimeType: string }> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      const [meta, base64] = result.split(",");
-      const mimeMatch = meta.match(/data:(.*);base64/);
-      resolve({ base64, mimeType: mimeMatch?.[1] ?? file.type });
-    };
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
-function base64ToFile(base64: string, mimeType: string, filename: string): File {
-  const byteChars = atob(base64);
-  const byteNumbers = new Array(byteChars.length);
-  for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
-  const byteArray = new Uint8Array(byteNumbers);
-  return new File([byteArray], filename, { type: mimeType });
-}
-
 export default function PlayersPage() {
   const { session } = useSession();
   const [players, setPlayers] = useState<Player[]>([]);
@@ -59,7 +37,6 @@ export default function PlayersPage() {
   const [detailPosition, setDetailPosition] = useState("");
   const [detailPhotoFile, setDetailPhotoFile] = useState<File | null>(null);
   const [savingDetail, setSavingDetail] = useState(false);
-  const [generatingAi, setGeneratingAi] = useState(false);
 
   async function loadData() {
     setLoading(true);
@@ -262,58 +239,6 @@ export default function PlayersPage() {
       if (url) await supabase.from("players").update({ photo_url: url }).eq("id", player.id);
     }
     setSavingDetail(false);
-    loadData();
-  }
-
-  async function handleGenerateAiCard(player: Player) {
-    if (!detailPhotoFile) {
-      setError("Yapay zeka kartı için önce bir fotoğraf seçin.");
-      return;
-    }
-    setGeneratingAi(true);
-    setError(null);
-    const ok = await saveBasicFields(player.id);
-    if (!ok) {
-      setGeneratingAi(false);
-      return;
-    }
-    try {
-      const { base64, mimeType } = await fileToBase64(detailPhotoFile);
-      const team = teams.find((t) => t.id === player.team_id);
-      const res = await fetch("/api/generate-player-card", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          photoBase64: base64,
-          mimeType,
-          playerName: detailName,
-          jerseyNumber: detailJerseyNumber,
-          position: detailPosition,
-          teamName: team?.name,
-          primaryColor: team?.primary_color,
-          secondaryColor: team?.secondary_color,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.imageBase64) {
-        const baseMessage = data.error ?? "Yapay zeka kartı oluşturulamadı.";
-        const detail =
-          typeof data.detail === "string" ? data.detail : data.detail ? JSON.stringify(data.detail) : null;
-        setError(detail ? `${baseMessage} — ${detail.slice(0, 400)}` : baseMessage);
-        setGeneratingAi(false);
-        return;
-      }
-      const file = base64ToFile(
-        data.imageBase64,
-        data.mimeType ?? "image/png",
-        `ai-card.${(data.mimeType ?? "image/png").split("/")[1] ?? "png"}`,
-      );
-      const url = await uploadImage("player-photos", player.id, file);
-      if (url) await supabase.from("players").update({ photo_url: url }).eq("id", player.id);
-    } catch {
-      setError("Yapay zeka kartı oluşturulurken bir hata oluştu.");
-    }
-    setGeneratingAi(false);
     loadData();
   }
 
@@ -529,23 +454,16 @@ export default function PlayersPage() {
                         className="text-sm"
                       />
                       <span className="text-xs text-foreground/50">
-                        Yapay zeka ile oluşturmak için bir selfie/portre seçin.
+                        Oyuncunun portre/vesikalık fotoğrafını seçin.
                       </span>
                     </label>
                     <div className="flex flex-wrap items-center gap-3">
                       <button
                         onClick={() => handleSaveDetail(player)}
-                        disabled={savingDetail || generatingAi}
+                        disabled={savingDetail}
                         className={`self-start ${primaryButton}`}
                       >
                         {savingDetail ? "Kaydediliyor..." : "Kaydet"}
-                      </button>
-                      <button
-                        onClick={() => handleGenerateAiCard(player)}
-                        disabled={generatingAi || savingDetail || !detailPhotoFile}
-                        className={`self-start ${secondaryButton}`}
-                      >
-                        {generatingAi ? "Kart Oluşturuluyor..." : "Yapay Zeka ile Profesyonel Kart Oluştur"}
                       </button>
                     </div>
                     {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}

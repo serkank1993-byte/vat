@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { cardInteractive, iconBadge, pageEyebrow, primaryButton, secondaryButton } from "@/lib/ui";
 import {
-  ActivityIcon,
   BarChartIcon,
   CalendarIcon,
   CheckCircleIcon,
@@ -22,7 +21,6 @@ const SECTIONS = [
     description: "İlk 11, diziliş ve duran top pozisyonlarını belirle.",
     icon: TacticsBoardIcon,
   },
-  { href: "/live", title: "Canlı Takip", description: "Sahada gerçek zamanlı olay girişi yap.", icon: ActivityIcon },
   {
     href: "/analysis",
     title: "Video Analiz",
@@ -41,7 +39,7 @@ export default function Home() {
           aria-hidden
         />
         <div className="relative flex flex-col gap-4">
-          <span className={pageEyebrow}>SahaIçi</span>
+          <span className={pageEyebrow}>Rohan FC</span>
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight max-w-2xl">
             Takımını yönet, maça hazırlan, performansı analiz et.
           </h1>

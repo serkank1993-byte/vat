@@ -205,7 +205,7 @@ export default function DashboardPage() {
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       {loading && <p className="text-foreground/60">Yükleniyor...</p>}
       <p className="text-sm text-foreground/60">
-        Bu sayfa, Canlı Takip ve Video Analiz sayfalarında kaydedilen olaylardan otomatik hesaplanır.
+        Bu sayfa, Video Analiz sayfasında kaydedilen olaylardan otomatik hesaplanır.
       </p>
 
       <div className="flex flex-wrap gap-2">
