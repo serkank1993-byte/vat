@@ -9,7 +9,7 @@ import { card, chip, dangerLink, input, primaryButton, secondaryButton, sectionT
 import PitchDiagram from "@/app/components/PitchDiagram";
 import PageHeading from "@/app/components/PageHeading";
 import EmptyState from "@/app/components/EmptyState";
-import { CalendarIcon, MaximizeIcon, MinimizeIcon, TacticsBoardIcon } from "@/lib/icons";
+import { CalendarIcon, ChevronDownIcon, MaximizeIcon, MinimizeIcon, TacticsBoardIcon } from "@/lib/icons";
 
 const TABS: { key: TacticsContext; label: string }[] = [
   { key: "starting", label: "İlk 11 & Diziliş" },
@@ -50,6 +50,7 @@ export default function TacticsPage() {
   const [announcedAt, setAnnouncedAt] = useState<string | null>(null);
   const [announcing, setAnnouncing] = useState(false);
   const [announceInfo, setAnnounceInfo] = useState<string | null>(null);
+  const [rosterOpen, setRosterOpen] = useState(true);
   const panelRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -555,31 +556,49 @@ export default function TacticsPage() {
                     ))}
                   </select>
                 </label>
-                <div className={`${card} flex flex-col gap-2 max-h-[28rem] overflow-y-auto`}>
-                  <h2 className={sectionTitle}>Kadro Yerleşimi</h2>
-                  {startingSlots.map((slot, i) => (
-                    <label key={i} className="flex items-center gap-2 text-sm">
-                      <span className="w-28 shrink-0 text-foreground/50">
-                        {(FORMATIONS[formation] ?? [])[i]?.label ?? `Slot ${i + 1}`}
-                      </span>
-                      <select
-                        value={slot.playerId ?? ""}
-                        onChange={(e) => handleAssignSlot(i, e.target.value ? Number(e.target.value) : null)}
-                        disabled={!canEdit}
-                        className={`flex-1 ${input}`}
-                      >
-                        <option value="">Boş</option>
-                        {roster
-                          .filter((p) => !assignedPlayerIds.has(p.id) || p.id === slot.playerId)
-                          .filter((p) => !onlyAttending || p.id === slot.playerId || isAttending(p.id))
-                          .map((p) => (
-                            <option key={p.id} value={p.id}>
-                              #{p.jersey_number} {p.name}
-                            </option>
-                          ))}
-                      </select>
-                    </label>
-                  ))}
+                <div className={`${card} flex flex-col gap-2`}>
+                  <button
+                    type="button"
+                    onClick={() => setRosterOpen((v) => !v)}
+                    className="flex items-center justify-between gap-2"
+                    aria-expanded={rosterOpen}
+                  >
+                    <span className={sectionTitle}>
+                      Kadro Yerleşimi ({assignedPlayerIds.size}/{startingSlots.length})
+                    </span>
+                    <ChevronDownIcon
+                      className={`h-5 w-5 text-foreground/50 transition-transform duration-300 ${
+                        rosterOpen ? "" : "-rotate-90"
+                      }`}
+                    />
+                  </button>
+                  {rosterOpen && (
+                    <div className="flex flex-col gap-2 max-h-[28rem] overflow-y-auto">
+                      {startingSlots.map((slot, i) => (
+                        <label key={i} className="flex items-center gap-2 text-sm">
+                          <span className="w-28 shrink-0 text-foreground/50">
+                            {(FORMATIONS[formation] ?? [])[i]?.label ?? `Slot ${i + 1}`}
+                          </span>
+                          <select
+                            value={slot.playerId ?? ""}
+                            onChange={(e) => handleAssignSlot(i, e.target.value ? Number(e.target.value) : null)}
+                            disabled={!canEdit}
+                            className={`flex-1 ${input}`}
+                          >
+                            <option value="">Boş</option>
+                            {roster
+                              .filter((p) => !assignedPlayerIds.has(p.id) || p.id === slot.playerId)
+                              .filter((p) => !onlyAttending || p.id === slot.playerId || isAttending(p.id))
+                              .map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  #{p.jersey_number} {p.name}
+                                </option>
+                              ))}
+                          </select>
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <p className="text-xs text-foreground/50">
                   Bir oyuncuyu sahada sürükleyerek tam konumunu ayarlayabilirsiniz.
