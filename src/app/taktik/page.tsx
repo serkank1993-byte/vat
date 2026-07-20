@@ -49,6 +49,7 @@ export default function TacticsPage() {
   const [isAnnounced, setIsAnnounced] = useState(false);
   const [announcedAt, setAnnouncedAt] = useState<string | null>(null);
   const [announcing, setAnnouncing] = useState(false);
+  const [announceInfo, setAnnounceInfo] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -338,10 +339,36 @@ export default function TacticsPage() {
     setSaved(true);
   }
 
+  async function sendAnnouncementPush(id: number) {
+    const {
+      data: { session: activeSession },
+    } = await supabase.auth.getSession();
+    if (!activeSession) return;
+    try {
+      const res = await fetch("/api/send-tactic-notification", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${activeSession.access_token}`,
+        },
+        body: JSON.stringify({ matchId: id }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(`Bildirim gönderilemedi (${res.status}): ${payload?.error ?? "bilinmeyen hata"}`);
+      } else {
+        setAnnounceInfo(`Bildirim gönderildi: ${payload?.sent ?? 0}/${payload?.total ?? 0} oyuncu.`);
+      }
+    } catch (err) {
+      setError(`Bildirim isteği gönderilemedi: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   async function handleAnnounce() {
     if (!selectedMatch) return;
     setAnnouncing(true);
     setError(null);
+    setAnnounceInfo(null);
     const now = new Date().toISOString();
     const { error: announceError } = await supabase.from("match_formations").upsert({
       match_id: selectedMatch.id,
@@ -357,25 +384,16 @@ export default function TacticsPage() {
     }
     setIsAnnounced(true);
     setAnnouncedAt(now);
+    await sendAnnouncementPush(selectedMatch.id);
+    setAnnouncing(false);
+  }
 
-    const {
-      data: { session: activeSession },
-    } = await supabase.auth.getSession();
-    if (activeSession) {
-      try {
-        await fetch("/api/send-tactic-notification", {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            authorization: `Bearer ${activeSession.access_token}`,
-          },
-          body: JSON.stringify({ matchId: selectedMatch.id }),
-        });
-      } catch {
-        // Bildirim gönderimi başarısız olsa bile duyuru işlemi tamamlanmış sayılır —
-        // oyuncular sayfayı açtıklarında taktiği zaten görebilecekler.
-      }
-    }
+  async function handleResendPush() {
+    if (!selectedMatch) return;
+    setAnnouncing(true);
+    setError(null);
+    setAnnounceInfo(null);
+    await sendAnnouncementPush(selectedMatch.id);
     setAnnouncing(false);
   }
 
@@ -393,6 +411,7 @@ export default function TacticsPage() {
       <PageHeading icon={TacticsBoardIcon} title="Taktik" />
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {announceInfo && <p className="text-sm text-accent">{announceInfo}</p>}
 
       <select value={matchId} onChange={(e) => setMatchId(e.target.value)} className={`self-start ${input}`}>
         <option value="">Bir maç seçin</option>
@@ -460,9 +479,13 @@ export default function TacticsPage() {
                   ? `Duyuruldu${announcedAt ? ` • ${new Date(announcedAt).toLocaleString("tr-TR")}` : ""}`
                   : "Bu taktik henüz duyurulmadı — yalnızca siz görebilirsiniz."}
               </span>
-              {!isAnnounced && (
+              {!isAnnounced ? (
                 <button onClick={handleAnnounce} disabled={announcing} className={primaryButton}>
                   {announcing ? "Duyuruluyor..." : "Oyunculara Duyur"}
+                </button>
+              ) : (
+                <button onClick={handleResendPush} disabled={announcing} className={secondaryButton}>
+                  {announcing ? "Gönderiliyor..." : "Bildirimi Tekrar Gönder"}
                 </button>
               )}
             </div>
