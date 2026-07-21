@@ -42,6 +42,26 @@ export function loadYouTubeIframeApi(): Promise<void> {
   return apiLoadPromise;
 }
 
+/**
+ * YouTube linkindeki başlangıç zamanını saniye olarak çıkarır (t= veya start=).
+ * "3759", "3759s", "1h2m39s", "62m39s" biçimlerini destekler. Yoksa null.
+ */
+export function extractYouTubeStart(url: string): number | null {
+  try {
+    const u = new URL(url.trim());
+    const raw = u.searchParams.get("t") ?? u.searchParams.get("start");
+    if (!raw) return null;
+    if (/^\d+$/.test(raw)) return Number(raw);
+    const match = raw.match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/);
+    if (!match) return null;
+    const [, h, m, s] = match;
+    const total = (Number(h ?? 0) * 3600) + (Number(m ?? 0) * 60) + Number(s ?? 0);
+    return total > 0 ? total : null;
+  } catch {
+    return null;
+  }
+}
+
 export function extractYouTubeId(url: string): string | null {
   try {
     const u = new URL(url.trim());

@@ -83,6 +83,52 @@ export function buildLineupSvg(opts: {
   </svg>`;
 }
 
+export type SummaryLine = { minute: number; label: string; detail: string };
+
+/** Maç özeti (skor + önemli anlar) paylaşılabilir görseli üretir. */
+export function buildMatchSummarySvg(opts: {
+  teamName: string;
+  opponentName: string;
+  date: string;
+  scoreFor: number | null;
+  scoreAgainst: number | null;
+  lines: SummaryLine[];
+}): { svg: string; width: number; height: number } {
+  const W = 660;
+  const headerH = 230;
+  const rowH = 46;
+  const pad = 26;
+  const bodyH = Math.max(1, opts.lines.length) * rowH + 40;
+  const H = headerH + bodyH + pad;
+  const score =
+    opts.scoreFor != null && opts.scoreAgainst != null ? `${opts.scoreFor} - ${opts.scoreAgainst}` : "—";
+
+  const rows =
+    opts.lines.length === 0
+      ? `<text x="${pad}" y="${headerH + 40}" font-size="16" fill="#94a3b8" font-family="Arial, sans-serif">Kaydedilmiş önemli an yok.</text>`
+      : opts.lines
+          .map((l, i) => {
+            const y = headerH + 30 + i * rowH;
+            return `
+              <text x="${pad}" y="${y}" font-size="20" font-weight="800" fill="#10b981" font-family="Arial, sans-serif">${l.minute}'</text>
+              <text x="${pad + 56}" y="${y}" font-size="18" font-weight="700" fill="#ffffff" font-family="Arial, sans-serif">${escapeXml(l.label)}</text>
+              <text x="${pad + 56}" y="${y + 20}" font-size="14" fill="#94a3b8" font-family="Arial, sans-serif">${escapeXml(l.detail)}</text>
+              <line x1="${pad}" y1="${y + 30}" x2="${W - pad}" y2="${y + 30}" stroke="#1e293b" stroke-width="1"/>`;
+          })
+          .join("");
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+    <rect width="${W}" height="${H}" fill="#0f172a"/>
+    <rect x="0" y="0" width="${W}" height="${headerH}" fill="#059669"/>
+    <text x="${W / 2}" y="52" text-anchor="middle" font-size="22" font-weight="700" fill="#ffffff" font-family="Arial, sans-serif">${escapeXml(opts.teamName)}</text>
+    <text x="${W / 2}" y="128" text-anchor="middle" font-size="66" font-weight="900" fill="#ffffff" font-family="Arial, sans-serif">${escapeXml(score)}</text>
+    <text x="${W / 2}" y="172" text-anchor="middle" font-size="22" font-weight="700" fill="#ffffff" font-family="Arial, sans-serif">${escapeXml(opts.opponentName)}</text>
+    <text x="${W / 2}" y="204" text-anchor="middle" font-size="15" fill="rgba(255,255,255,0.85)" font-family="Arial, sans-serif">${escapeXml(opts.date)}</text>
+    ${rows}
+  </svg>`;
+  return { svg, width: W, height: H };
+}
+
 /** SVG string'i PNG Blob'a çevirir. */
 export function svgToPngBlob(svg: string, width: number, height: number): Promise<Blob> {
   return new Promise((resolve, reject) => {

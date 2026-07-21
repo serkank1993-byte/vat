@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Match, MatchEvent, Player, Team } from "@/lib/types";
 import { EVENT_TYPES, ZONES } from "@/lib/match-tracking";
-import { extractYouTubeId, loadYouTubeIframeApi, type YTPlayer } from "@/lib/youtube";
+import { extractYouTubeId, extractYouTubeStart, loadYouTubeIframeApi, type YTPlayer } from "@/lib/youtube";
+import { buildMatchSummarySvg, shareOrDownloadPng, svgToPngBlob, type SummaryLine } from "@/lib/lineupImage";
 import { card, chip, dangerLink, input, primaryButton, secondaryButton, sectionTitle } from "@/lib/ui";
 import PageHeading from "@/app/components/PageHeading";
 import { PlayCircleIcon } from "@/lib/icons";
@@ -24,8 +25,15 @@ export default function AnalysisPage() {
   const [selectedZone, setSelectedZone] = useState<number | null>(null);
   const [events, setEvents] = useState<MatchEvent[]>([]);
   const [playerReady, setPlayerReady] = useState(false);
+  const [kickoffSeconds, setKickoffSeconds] = useState(0);
+  const [kickoffSaved, setKickoffSaved] = useState(false);
+  const [sharingSummary, setSharingSummary] = useState(false);
 
   const ytPlayerRef = useRef<YTPlayer | null>(null);
+  const kickoffRef = useRef(0);
+  useEffect(() => {
+    kickoffRef.current = kickoffSeconds;
+  }, [kickoffSeconds]);
 
   async function loadBaseData() {
     setLoading(true);
@@ -72,25 +80,50 @@ export default function AnalysisPage() {
     ytPlayerRef.current = null;
     const match = matches.find((m) => m.id === Number(id));
     setVideoUrlInput(match?.video_url ?? "");
+    setKickoffSeconds(match?.video_kickoff_seconds ?? 0);
+    setKickoffSaved(false);
     loadEvents(id);
   }
 
   async function handleSaveVideoUrl(e: React.FormEvent) {
     e.preventDefault();
     if (!matchId || !videoUrlInput.trim()) return;
-    if (!extractYouTubeId(videoUrlInput.trim())) {
+    const trimmed = videoUrlInput.trim();
+    if (!extractYouTubeId(trimmed)) {
       setError("Bu geçerli bir YouTube linkine benzemiyor.");
       return;
     }
+    // Linkte t= varsa maç başlangıcı önerisi olarak al.
+    const suggestedStart = extractYouTubeStart(trimmed);
+    const update: { video_url: string; video_kickoff_seconds?: number } = { video_url: trimmed };
+    if (suggestedStart != null && kickoffSeconds === 0) update.video_kickoff_seconds = suggestedStart;
+    const { error } = await supabase.from("matches").update(update).eq("id", Number(matchId));
+    if (error) setError(error.message);
+    else {
+      if (update.video_kickoff_seconds != null) setKickoffSeconds(update.video_kickoff_seconds);
+      setMatches((prev) =>
+        prev.map((m) =>
+          m.id === Number(matchId)
+            ? { ...m, video_url: trimmed, ...(update.video_kickoff_seconds != null ? { video_kickoff_seconds: update.video_kickoff_seconds } : {}) }
+            : m,
+        ),
+      );
+    }
+  }
+
+  async function handleMarkKickoff() {
+    if (!matchId) return;
+    const t = Math.floor(ytPlayerRef.current?.getCurrentTime() ?? 0);
+    setKickoffSeconds(t);
     const { error } = await supabase
       .from("matches")
-      .update({ video_url: videoUrlInput.trim() })
+      .update({ video_kickoff_seconds: t })
       .eq("id", Number(matchId));
     if (error) setError(error.message);
     else {
-      setMatches((prev) =>
-        prev.map((m) => (m.id === Number(matchId) ? { ...m, video_url: videoUrlInput.trim() } : m)),
-      );
+      setMatches((prev) => prev.map((m) => (m.id === Number(matchId) ? { ...m, video_kickoff_seconds: t } : m)));
+      setKickoffSaved(true);
+      setTimeout(() => setKickoffSaved(false), 2000);
     }
   }
 
@@ -101,6 +134,7 @@ export default function AnalysisPage() {
       if (cancelled || !window.YT) return;
       ytPlayerRef.current = new window.YT.Player(PLAYER_ELEMENT_ID, {
         videoId,
+        playerVars: { start: Math.floor(kickoffRef.current) },
         events: {
           onReady: (e) => {
             ytPlayerRef.current = e.target;
@@ -132,9 +166,10 @@ export default function AnalysisPage() {
   function logEvent(eventType: string) {
     if (!matchId || !selectedPlayerId) return;
     const currentTime = ytPlayerRef.current?.getCurrentTime() ?? 0;
-    const minute = Math.floor(currentTime / 60);
-    const second = Math.floor(currentTime % 60);
-    // eslint-disable-next-line react-hooks/purity -- runs in a click handler, not during render
+    // Maç başlangıcına göre göreli süre (uzun yayınlarda maç dakikası).
+    const matchSeconds = Math.max(0, currentTime - kickoffRef.current);
+    const minute = Math.floor(matchSeconds / 60);
+    const second = Math.floor(matchSeconds % 60);
     const tempId = -Date.now();
     const optimisticEvent: MatchEvent = {
       id: tempId,
@@ -200,8 +235,70 @@ export default function AnalysisPage() {
   }
 
   function seekTo(minute: number, second: number | null) {
-    ytPlayerRef.current?.seekTo(minute * 60 + (second ?? 0), true);
+    ytPlayerRef.current?.seekTo(kickoffRef.current + minute * 60 + (second ?? 0), true);
     ytPlayerRef.current?.playVideo();
+  }
+
+  function formatHms(totalSeconds: number) {
+    const s = Math.floor(totalSeconds);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    const mm = m.toString().padStart(2, "0");
+    const ss = sec.toString().padStart(2, "0");
+    return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+  }
+
+  // Klavye kısayolları: 1-9 tuşları olay türlerini kaydeder.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (!selectedPlayerId || !playerReady) return;
+      const idx = Number(e.key) - 1;
+      if (Number.isInteger(idx) && idx >= 0 && idx < EVENT_TYPES.length) {
+        logEvent(EVENT_TYPES[idx].key);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPlayerId, playerReady, matchId, selectedZone]);
+
+  // Maç özeti için önemli anlar (gol, asist, kart, isabetli şut).
+  const highlightKeys = ["goal", "assist", "shot_on_target", "yellow_card", "red_card"];
+  const summaryLines: SummaryLine[] = useMemo(() => {
+    return events
+      .filter((e) => highlightKeys.includes(e.event_type))
+      .slice()
+      .sort((a, b) => a.minute - b.minute || (a.second ?? 0) - (b.second ?? 0))
+      .map((e) => ({
+        minute: e.minute,
+        label: EVENT_TYPES.find((et) => et.key === e.event_type)?.label ?? e.event_type,
+        detail: playerLabel(e.player_id),
+      }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events, players]);
+
+  async function handleShareSummary() {
+    if (!selectedMatch) return;
+    setSharingSummary(true);
+    setError(null);
+    try {
+      const { svg, width, height } = buildMatchSummarySvg({
+        teamName: teamName(selectedMatch.team_id),
+        opponentName: selectedMatch.opponent_name,
+        date: new Date(selectedMatch.match_date).toLocaleDateString("tr-TR"),
+        scoreFor: selectedMatch.score_for,
+        scoreAgainst: selectedMatch.score_against,
+        lines: summaryLines,
+      });
+      const blob = await svgToPngBlob(svg, width, height);
+      await shareOrDownloadPng(blob, "mac-ozeti.png");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Özet görseli oluşturulamadı.");
+    }
+    setSharingSummary(false);
   }
 
   return (
@@ -248,6 +345,29 @@ export default function AnalysisPage() {
               <div id={PLAYER_ELEMENT_ID} className="w-full h-full" />
             </div>
             {!playerReady && <p className="text-sm text-foreground/60 pt-2">Oynatıcı yükleniyor...</p>}
+
+            <div className={`${card} mt-3 flex flex-col gap-2`}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm text-foreground/70">
+                  Maç başlangıcı:{" "}
+                  <span className="font-mono font-medium text-foreground">{formatHms(kickoffSeconds)}</span>
+                </span>
+                <button
+                  onClick={() => ytPlayerRef.current?.seekTo(kickoffSeconds, true)}
+                  disabled={!playerReady}
+                  className={`${secondaryButton} py-1.5 px-3 text-sm`}
+                >
+                  Başlangıca git
+                </button>
+              </div>
+              <button onClick={handleMarkKickoff} disabled={!playerReady} className={primaryButton}>
+                {kickoffSaved ? "Kaydedildi ✓" : "Şu anı maç başlangıcı yap"}
+              </button>
+              <p className="text-xs text-foreground/50">
+                Videoyu ilk vuruş anına getirip bu düğmeye bas. Böylece tüm olaylar maç dakikası olarak
+                kaydedilir ve uzun yayınlarda doğru ana atlar.
+              </p>
+            </div>
           </div>
 
           <div className="mt-6 md:mt-0 md:w-[320px] md:shrink-0 flex flex-col gap-4">
@@ -298,17 +418,52 @@ export default function AnalysisPage() {
                 </button>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                {EVENT_TYPES.map((et) => (
+                {EVENT_TYPES.map((et, i) => (
                   <button
                     key={et.key}
                     onClick={() => logEvent(et.key)}
                     disabled={!selectedPlayerId || !playerReady}
-                    className={`${secondaryButton} py-3 px-1 text-sm`}
+                    className={`${secondaryButton} relative py-3 px-1 text-sm`}
                   >
+                    {i < 9 && (
+                      <span className="absolute top-1 left-1.5 text-[10px] font-mono text-foreground/40">
+                        {i + 1}
+                      </span>
+                    )}
                     {et.label}
                   </button>
                 ))}
               </div>
+              <p className="text-xs text-foreground/50">
+                İpucu: Bir oyuncu seçiliyken klavyeden <span className="font-mono">1–9</span> tuşlarıyla hızlıca
+                olay ekleyebilirsin.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <h2 className={sectionTitle}>Maç Özeti</h2>
+                <button
+                  onClick={handleShareSummary}
+                  disabled={sharingSummary}
+                  className="text-sm text-accent hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {sharingSummary ? "Hazırlanıyor..." : "Görsel Paylaş"}
+                </button>
+              </div>
+              {summaryLines.length === 0 ? (
+                <p className="text-foreground/60 text-sm">Önemli an (gol, asist, kart) kaydedilince burada özetlenir.</p>
+              ) : (
+                <ul className="flex flex-col gap-1.5">
+                  {summaryLines.map((l, i) => (
+                    <li key={i} className="flex items-center gap-2 text-sm">
+                      <span className="font-mono font-semibold text-accent w-9 shrink-0">{l.minute}&apos;</span>
+                      <span className="font-medium">{l.label}</span>
+                      <span className="text-foreground/50">— {l.detail}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             <div className="flex flex-col gap-2">
