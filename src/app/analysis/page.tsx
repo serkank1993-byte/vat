@@ -28,6 +28,9 @@ export default function AnalysisPage() {
   const [kickoffSeconds, setKickoffSeconds] = useState(0);
   const [kickoffSaved, setKickoffSaved] = useState(false);
   const [sharingSummary, setSharingSummary] = useState(false);
+  const [logDelay, setLogDelay] = useState(3);
+  const [startingIds, setStartingIds] = useState<number[]>([]);
+  const [pendingBookmarkId, setPendingBookmarkId] = useState<number | null>(null);
 
   const ytPlayerRef = useRef<YTPlayer | null>(null);
   const kickoffRef = useRef(0);
@@ -60,16 +63,28 @@ export default function AnalysisPage() {
   async function loadEvents(forMatchId: string) {
     if (!forMatchId) {
       setEvents([]);
+      setStartingIds([]);
       return;
     }
-    const { data, error } = await supabase
-      .from("events")
-      .select("*")
-      .eq("match_id", Number(forMatchId))
-      .order("minute", { ascending: false })
-      .order("second", { ascending: false });
-    if (error) setError(error.message);
-    else setEvents(data ?? []);
+    const [evRes, tacRes] = await Promise.all([
+      supabase
+        .from("events")
+        .select("*")
+        .eq("match_id", Number(forMatchId))
+        .order("minute", { ascending: false })
+        .order("second", { ascending: false }),
+      supabase
+        .from("match_tactics")
+        .select("player_id, slot_index")
+        .eq("match_id", Number(forMatchId))
+        .eq("context", "starting"),
+    ]);
+    if (evRes.error) setError(evRes.error.message);
+    else setEvents(evRes.data ?? []);
+    const tac = (tacRes.data ?? [])
+      .slice()
+      .sort((a, b) => (a.slot_index ?? 99) - (b.slot_index ?? 99));
+    setStartingIds(tac.map((t) => t.player_id as number));
   }
 
   function handleSelectMatch(id: string) {
@@ -77,6 +92,7 @@ export default function AnalysisPage() {
     setSelectedPlayerId("");
     setSelectedZone(null);
     setPlayerReady(false);
+    setPendingBookmarkId(null);
     ytPlayerRef.current = null;
     const match = matches.find((m) => m.id === Number(id));
     setVideoUrlInput(match?.video_url ?? "");
@@ -165,9 +181,34 @@ export default function AnalysisPage() {
 
   function logEvent(eventType: string) {
     if (!matchId || !selectedPlayerId) return;
+
+    // Bir "önemli an" detaylandırılıyorsa, o yer imini gerçek olaya dönüştür.
+    if (pendingBookmarkId != null) {
+      const bid = pendingBookmarkId;
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === bid
+            ? { ...e, event_type: eventType, player_id: Number(selectedPlayerId), zone: selectedZone }
+            : e,
+        ),
+      );
+      setPendingBookmarkId(null);
+      supabase
+        .from("events")
+        .update({ event_type: eventType, player_id: Number(selectedPlayerId), zone: selectedZone })
+        .eq("id", bid)
+        .then(({ error }) => {
+          if (error) {
+            setError(error.message);
+            loadEvents(matchId);
+          }
+        });
+      return;
+    }
+
     const currentTime = ytPlayerRef.current?.getCurrentTime() ?? 0;
-    // Maç başlangıcına göre göreli süre (uzun yayınlarda maç dakikası).
-    const matchSeconds = Math.max(0, currentTime - kickoffRef.current);
+    // Maç başlangıcına göre göreli süre; gecikmeyi geri al (geç basılan olayı gerçek anına yaz).
+    const matchSeconds = Math.max(0, currentTime - kickoffRef.current - logDelay);
     const minute = Math.floor(matchSeconds / 60);
     const second = Math.floor(matchSeconds % 60);
     const tempId = -Date.now();
@@ -204,6 +245,46 @@ export default function AnalysisPage() {
           setEvents((prev) => prev.map((e) => (e.id === tempId ? data : e)));
         }
       });
+  }
+
+  // Hızlı tarama: sadece anı yer-imle (oyuncu/olay seçmeden).
+  function addBookmark() {
+    if (!matchId) return;
+    const currentTime = ytPlayerRef.current?.getCurrentTime() ?? 0;
+    const matchSeconds = Math.max(0, currentTime - kickoffRef.current - logDelay);
+    const minute = Math.floor(matchSeconds / 60);
+    const second = Math.floor(matchSeconds % 60);
+    const tempId = -Date.now();
+    const optimistic: MatchEvent = {
+      id: tempId,
+      match_id: Number(matchId),
+      player_id: null,
+      event_type: "bookmark",
+      minute,
+      second,
+      description: null,
+      zone: null,
+      created_at: new Date().toISOString(),
+    };
+    setEvents((prev) => [optimistic, ...prev]);
+    supabase
+      .from("events")
+      .insert({ match_id: Number(matchId), player_id: null, event_type: "bookmark", minute, second })
+      .select()
+      .single()
+      .then(({ data, error }) => {
+        if (error) {
+          setError(error.message);
+          setEvents((prev) => prev.filter((e) => e.id !== tempId));
+        } else if (data) {
+          setEvents((prev) => prev.map((e) => (e.id === tempId ? data : e)));
+        }
+      });
+  }
+
+  function startDetailing(b: MatchEvent) {
+    setPendingBookmarkId(b.id);
+    seekTo(b.minute, b.second);
   }
 
   function handleUndoLast() {
@@ -263,7 +344,30 @@ export default function AnalysisPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPlayerId, playerReady, matchId, selectedZone]);
+  }, [selectedPlayerId, playerReady, matchId, selectedZone, logDelay, pendingBookmarkId]);
+
+  // İlk 11 önde: dizilişteki oyuncular listenin başında.
+  const orderedPlayers = useMemo(() => {
+    const order = new Map(startingIds.map((id, i) => [id, i]));
+    return [...playersForSelectedMatch].sort((a, b) => {
+      const ai = order.has(a.id) ? (order.get(a.id) as number) : Infinity;
+      const bi = order.has(b.id) ? (order.get(b.id) as number) : Infinity;
+      if (ai !== bi) return ai - bi;
+      return a.jersey_number - b.jersey_number;
+    });
+  }, [playersForSelectedMatch, startingIds]);
+  const startingSet = useMemo(() => new Set(startingIds), [startingIds]);
+
+  const bookmarks = useMemo(
+    () =>
+      events
+        .filter((e) => e.event_type === "bookmark")
+        .slice()
+        .sort((a, b) => a.minute - b.minute || (a.second ?? 0) - (b.second ?? 0)),
+    [events],
+  );
+  const realEvents = useMemo(() => events.filter((e) => e.event_type !== "bookmark"), [events]);
+  const pendingBookmark = bookmarks.find((b) => b.id === pendingBookmarkId) ?? null;
 
   // Maç özeti için önemli anlar (gol, asist, kart, isabetli şut).
   const highlightKeys = ["goal", "assist", "shot_on_target", "yellow_card", "red_card"];
@@ -368,22 +472,67 @@ export default function AnalysisPage() {
                 kaydedilir ve uzun yayınlarda doğru ana atlar.
               </p>
             </div>
+
+            <div className={`${card} mt-3 flex flex-col gap-3`}>
+              <button
+                onClick={addBookmark}
+                disabled={!playerReady}
+                className={`${primaryButton} justify-center py-3 text-base`}
+              >
+                ⭐ Önemli An İşaretle
+              </button>
+              <p className="text-xs text-foreground/50">
+                Videoyu hızlıca izlerken sadece önemli anları işaretle (oyuncu seçmene gerek yok). Sonra
+                aşağıdaki <strong>Doldurulacak Anlar</strong> listesinden yalnızca o anları detaylandır.
+              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-foreground/60">Olay gecikmesi:</span>
+                {[0, 3, 5].map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setLogDelay(d)}
+                    className={`${chip(logDelay === d)} py-1 px-3 text-xs`}
+                  >
+                    {d} sn
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-foreground/50">
+                Geç bastığın için, işaretlenen an otomatik {logDelay} sn geri alınır.
+              </p>
+            </div>
           </div>
 
           <div className="mt-6 md:mt-0 md:w-[320px] md:shrink-0 flex flex-col gap-4">
+            {pendingBookmark && (
+              <div className={`${card} flex flex-col gap-2 border-accent/40 bg-accent/5`}>
+                <p className="text-sm">
+                  <span className="font-mono font-semibold text-accent">{pendingBookmark.minute}&apos;</span>{" "}
+                  anını detaylandırıyorsun — oyuncuyu ve olay türünü seç.
+                </p>
+                <button onClick={() => setPendingBookmarkId(null)} className={`self-start ${dangerLink}`}>
+                  Vazgeç
+                </button>
+              </div>
+            )}
+
             <div className="flex flex-col gap-2">
               <h2 className={sectionTitle}>Aktif Oyuncu</h2>
+              {startingSet.size > 0 && (
+                <p className="text-xs text-foreground/50">İlk 11 (dizilişten) başta gösteriliyor.</p>
+              )}
               <div className="flex flex-wrap gap-2">
-                {playersForSelectedMatch.map((p) => (
+                {orderedPlayers.map((p) => (
                   <button
                     key={p.id}
                     onClick={() => setSelectedPlayerId(String(p.id))}
                     className={chip(selectedPlayerId === String(p.id))}
                   >
+                    {startingSet.has(p.id) && <span className="text-yellow-400">★ </span>}
                     #{p.jersey_number} {p.name}
                   </button>
                 ))}
-                {playersForSelectedMatch.length === 0 && (
+                {orderedPlayers.length === 0 && (
                   <p className="text-foreground/60 text-sm">Bu maçın takımı için oyuncu bulunamadı.</p>
                 )}
               </div>
@@ -466,13 +615,44 @@ export default function AnalysisPage() {
               )}
             </div>
 
+            {bookmarks.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <h2 className={sectionTitle}>Doldurulacak Anlar ({bookmarks.length})</h2>
+                <ul className="flex flex-col gap-2">
+                  {bookmarks.map((b) => (
+                    <li
+                      key={b.id}
+                      className={`${card} flex items-center justify-between py-3 text-sm ${
+                        b.id < 0 ? "opacity-50" : ""
+                      } ${pendingBookmarkId === b.id ? "border-accent/50 bg-accent/5" : ""}`}
+                    >
+                      <button onClick={() => seekTo(b.minute, b.second)} className="hover:underline">
+                        <span className="font-mono text-accent">
+                          {b.minute}:{(b.second ?? 0).toString().padStart(2, "0")}
+                        </span>{" "}
+                        — ⭐ önemli an
+                      </button>
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => startDetailing(b)} className="text-accent hover:underline">
+                          Detaylandır
+                        </button>
+                        <button onClick={() => handleDeleteEvent(b.id)} className={dangerLink}>
+                          Sil
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <div className="flex flex-col gap-2">
               <h2 className={sectionTitle}>Olay Akışı</h2>
-              {events.length === 0 ? (
+              {realEvents.length === 0 ? (
                 <p className="text-foreground/60 text-sm">Henüz olay kaydedilmedi.</p>
               ) : (
                 <ul className="flex flex-col gap-2 max-h-80 overflow-y-auto">
-                  {events.map((ev) => (
+                  {realEvents.map((ev) => (
                     <li
                       key={ev.id}
                       className={`${card} flex items-center justify-between py-3 text-sm ${
