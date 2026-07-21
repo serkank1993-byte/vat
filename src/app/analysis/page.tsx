@@ -31,6 +31,7 @@ export default function AnalysisPage() {
   const [logDelay, setLogDelay] = useState(3);
   const [startingIds, setStartingIds] = useState<number[]>([]);
   const [pendingBookmarkId, setPendingBookmarkId] = useState<number | null>(null);
+  const [playerFilter, setPlayerFilter] = useState("");
 
   const ytPlayerRef = useRef<YTPlayer | null>(null);
   const kickoffRef = useRef(0);
@@ -411,6 +412,16 @@ export default function AnalysisPage() {
   }, [playersForSelectedMatch, startingIds]);
   const startingSet = useMemo(() => new Set(startingIds), [startingIds]);
 
+  const filteredPlayers = useMemo(() => {
+    const q = playerFilter.trim().toLocaleLowerCase("tr");
+    if (!q) return orderedPlayers;
+    return orderedPlayers.filter(
+      (p) => p.name.toLocaleLowerCase("tr").includes(q) || String(p.jersey_number).includes(q),
+    );
+  }, [orderedPlayers, playerFilter]);
+
+  const selectedPlayer = players.find((p) => p.id === Number(selectedPlayerId)) ?? null;
+
   const bookmarks = useMemo(
     () =>
       events
@@ -591,23 +602,46 @@ export default function AnalysisPage() {
             )}
 
             <div className="flex flex-col gap-2">
-              <h2 className={sectionTitle}>Aktif Oyuncu</h2>
-              {startingSet.size > 0 && (
-                <p className="text-xs text-foreground/50">İlk 11 (dizilişten) başta gösteriliyor.</p>
-              )}
-              <div className="flex flex-wrap gap-2">
-                {orderedPlayers.map((p) => (
+              <div className="flex items-center justify-between gap-2">
+                <h2 className={sectionTitle}>Aktif Oyuncu</h2>
+                {selectedPlayer && (
+                  <span className="text-xs text-accent font-medium">
+                    Seçili: #{selectedPlayer.jersey_number} {selectedPlayer.name}
+                  </span>
+                )}
+              </div>
+              <input
+                value={playerFilter}
+                onChange={(e) => setPlayerFilter(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && filteredPlayers.length === 1) {
+                    setSelectedPlayerId(String(filteredPlayers[0].id));
+                    setPlayerFilter("");
+                  }
+                }}
+                placeholder="Oyuncu ara — isim veya forma no"
+                className={`${input} text-sm`}
+              />
+              <div className="flex flex-wrap gap-2 max-h-44 overflow-y-auto">
+                {filteredPlayers.map((p) => (
                   <button
                     key={p.id}
-                    onClick={() => setSelectedPlayerId(String(p.id))}
+                    onClick={() => {
+                      setSelectedPlayerId(String(p.id));
+                      setPlayerFilter("");
+                    }}
                     className={chip(selectedPlayerId === String(p.id))}
                   >
                     {startingSet.has(p.id) && <span className="text-yellow-400">★ </span>}
                     #{p.jersey_number} {p.name}
                   </button>
                 ))}
-                {orderedPlayers.length === 0 && (
+                {orderedPlayers.length === 0 ? (
                   <p className="text-foreground/60 text-sm">Bu maçın takımı için oyuncu bulunamadı.</p>
+                ) : (
+                  filteredPlayers.length === 0 && (
+                    <p className="text-foreground/60 text-sm">Eşleşen oyuncu yok.</p>
+                  )
                 )}
               </div>
             </div>
