@@ -287,6 +287,59 @@ export default function AnalysisPage() {
     seekTo(b.minute, b.second);
   }
 
+  function logOpponentGoal() {
+    if (!matchId) return;
+    // Bir yer imi detaylandırılıyorsa onu rakip golüne dönüştür (oyuncu gerekmez).
+    if (pendingBookmarkId != null) {
+      const bid = pendingBookmarkId;
+      setEvents((prev) =>
+        prev.map((e) => (e.id === bid ? { ...e, event_type: "opponent_goal", player_id: null, zone: null } : e)),
+      );
+      setPendingBookmarkId(null);
+      supabase
+        .from("events")
+        .update({ event_type: "opponent_goal", player_id: null, zone: null })
+        .eq("id", bid)
+        .then(({ error }) => {
+          if (error) {
+            setError(error.message);
+            loadEvents(matchId);
+          }
+        });
+      return;
+    }
+    const currentTime = ytPlayerRef.current?.getCurrentTime() ?? 0;
+    const matchSeconds = Math.max(0, currentTime - kickoffRef.current - logDelay);
+    const minute = Math.floor(matchSeconds / 60);
+    const second = Math.floor(matchSeconds % 60);
+    const tempId = -Date.now();
+    const optimistic: MatchEvent = {
+      id: tempId,
+      match_id: Number(matchId),
+      player_id: null,
+      event_type: "opponent_goal",
+      minute,
+      second,
+      description: null,
+      zone: null,
+      created_at: new Date().toISOString(),
+    };
+    setEvents((prev) => [optimistic, ...prev]);
+    supabase
+      .from("events")
+      .insert({ match_id: Number(matchId), player_id: null, event_type: "opponent_goal", minute, second })
+      .select()
+      .single()
+      .then(({ data, error }) => {
+        if (error) {
+          setError(error.message);
+          setEvents((prev) => prev.filter((e) => e.id !== tempId));
+        } else if (data) {
+          setEvents((prev) => prev.map((e) => (e.id === tempId ? data : e)));
+        }
+      });
+  }
+
   function handleUndoLast() {
     const last = events[0];
     if (!last) return;
@@ -369,20 +422,41 @@ export default function AnalysisPage() {
   const realEvents = useMemo(() => events.filter((e) => e.event_type !== "bookmark"), [events]);
   const pendingBookmark = bookmarks.find((b) => b.id === pendingBookmarkId) ?? null;
 
-  // Maç özeti için önemli anlar (gol, asist, kart, isabetli şut).
-  const highlightKeys = ["goal", "assist", "shot_on_target", "yellow_card", "red_card"];
-  const summaryLines: SummaryLine[] = useMemo(() => {
+  function labelFor(type: string) {
+    return (
+      EVENT_TYPES.find((et) => et.key === type)?.label ??
+      (type === "opponent_goal" ? "Rakip Golü" : type === "bookmark" ? "Önemli an" : type)
+    );
+  }
+
+  // Özet / önemli anlar: goller (bizim+rakip), asist, kart, isabetli şut ve yer imleri.
+  const HL_KEYS = ["goal", "assist", "shot_on_target", "yellow_card", "red_card", "opponent_goal"];
+  const highlightItems = useMemo(() => {
     return events
-      .filter((e) => highlightKeys.includes(e.event_type))
+      .filter((e) => HL_KEYS.includes(e.event_type) || e.event_type === "bookmark")
       .slice()
       .sort((a, b) => a.minute - b.minute || (a.second ?? 0) - (b.second ?? 0))
       .map((e) => ({
+        id: e.id,
         minute: e.minute,
-        label: EVENT_TYPES.find((et) => et.key === e.event_type)?.label ?? e.event_type,
-        detail: playerLabel(e.player_id),
+        second: e.second,
+        label: labelFor(e.event_type),
+        detail:
+          e.event_type === "opponent_goal"
+            ? (selectedMatch?.opponent_name ?? "Rakip")
+            : e.event_type === "bookmark"
+              ? ""
+              : playerLabel(e.player_id),
+        isBookmark: e.event_type === "bookmark",
       }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [events, players]);
+  }, [events, players, selectedMatch]);
+
+  // Paylaşılan görsel: yer imleri hariç, anlamlı olaylar.
+  const imageLines: SummaryLine[] = useMemo(
+    () => highlightItems.filter((h) => !h.isBookmark).map((h) => ({ minute: h.minute, label: h.label, detail: h.detail })),
+    [highlightItems],
+  );
 
   async function handleShareSummary() {
     if (!selectedMatch) return;
@@ -395,7 +469,7 @@ export default function AnalysisPage() {
         date: new Date(selectedMatch.match_date).toLocaleDateString("tr-TR"),
         scoreFor: selectedMatch.score_for,
         scoreAgainst: selectedMatch.score_against,
-        lines: summaryLines,
+        lines: imageLines,
       });
       const blob = await svgToPngBlob(svg, width, height);
       await shareOrDownloadPng(blob, "mac-ozeti.png");
@@ -587,6 +661,13 @@ export default function AnalysisPage() {
                 İpucu: Bir oyuncu seçiliyken klavyeden <span className="font-mono">1–9</span> tuşlarıyla hızlıca
                 olay ekleyebilirsin.
               </p>
+              <button
+                onClick={logOpponentGoal}
+                disabled={!playerReady}
+                className={`${secondaryButton} justify-center border-red-500/40 text-red-600 dark:text-red-400`}
+              >
+                ⚽ Rakip Golü {pendingBookmark ? "(bu anı işaretle)" : "(oyuncu gerekmez)"}
+              </button>
             </div>
 
             <div className="flex flex-col gap-2">
@@ -600,15 +681,22 @@ export default function AnalysisPage() {
                   {sharingSummary ? "Hazırlanıyor..." : "Görsel Paylaş"}
                 </button>
               </div>
-              {summaryLines.length === 0 ? (
-                <p className="text-foreground/60 text-sm">Önemli an (gol, asist, kart) kaydedilince burada özetlenir.</p>
+              {highlightItems.length === 0 ? (
+                <p className="text-foreground/60 text-sm">Önemli anlar (gol, rakip golü, kart, yer imi) burada listelenir. Satıra dokununca videoda o ana atlar.</p>
               ) : (
-                <ul className="flex flex-col gap-1.5">
-                  {summaryLines.map((l, i) => (
-                    <li key={i} className="flex items-center gap-2 text-sm">
-                      <span className="font-mono font-semibold text-accent w-9 shrink-0">{l.minute}&apos;</span>
-                      <span className="font-medium">{l.label}</span>
-                      <span className="text-foreground/50">— {l.detail}</span>
+                <ul className="flex flex-col gap-1">
+                  {highlightItems.map((h) => (
+                    <li key={h.id}>
+                      <button
+                        onClick={() => seekTo(h.minute, h.second)}
+                        className="flex w-full items-center gap-2 text-left text-sm rounded-md px-1.5 py-1 hover:bg-foreground/5"
+                      >
+                        <span className="font-mono font-semibold text-accent w-9 shrink-0">{h.minute}&apos;</span>
+                        <span className={`font-medium ${h.isBookmark ? "text-foreground/60" : ""}`}>
+                          {h.isBookmark ? "⭐ " : ""}{h.label}
+                        </span>
+                        {h.detail && <span className="text-foreground/50">— {h.detail}</span>}
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -663,8 +751,11 @@ export default function AnalysisPage() {
                         <span className="font-mono text-accent">
                           {ev.minute}:{(ev.second ?? 0).toString().padStart(2, "0")}
                         </span>{" "}
-                        — {playerLabel(ev.player_id)} —{" "}
-                        {EVENT_TYPES.find((et) => et.key === ev.event_type)?.label ?? ev.event_type}
+                        —{" "}
+                        {ev.event_type === "opponent_goal"
+                          ? (selectedMatch?.opponent_name ?? "Rakip")
+                          : playerLabel(ev.player_id)}{" "}
+                        — {labelFor(ev.event_type)}
                         {ev.zone && ` — ${ZONES.find((z) => z.value === ev.zone)?.label}`}
                       </button>
                       <button onClick={() => handleDeleteEvent(ev.id)} className={dangerLink}>
