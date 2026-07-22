@@ -52,6 +52,8 @@ export default function TacticsPage() {
   const [announcing, setAnnouncing] = useState(false);
   const [announceInfo, setAnnounceInfo] = useState<string | null>(null);
   const [rosterOpen, setRosterOpen] = useState(true);
+  const [activeSlotIndex, setActiveSlotIndex] = useState<number | null>(null);
+  const [slotPickerFilter, setSlotPickerFilter] = useState("");
   const [sharingLineup, setSharingLineup] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -271,24 +273,47 @@ export default function TacticsPage() {
   }
 
   function handleSlotPointerDown(slotIndex: number, e: React.PointerEvent<HTMLDivElement>) {
-    if (!canEdit || startingSlots[slotIndex].playerId == null) return;
+    if (!canEdit) return;
     e.preventDefault();
     e.stopPropagation();
+    const hasPlayer = startingSlots[slotIndex].playerId != null;
     const pitchEl = (e.currentTarget as HTMLElement).closest("[data-pitch]") as HTMLElement | null;
-    if (!pitchEl) return;
-    const rect = pitchEl.getBoundingClientRect();
+    const rect = pitchEl?.getBoundingClientRect() ?? null;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let moved = false;
 
     function onMove(moveEvent: PointerEvent) {
-      const x = ((moveEvent.clientX - rect.left) / rect.width) * 100;
-      const y = 100 - ((moveEvent.clientY - rect.top) / rect.height) * 100;
-      handleSlotDrag(slotIndex, Math.min(100, Math.max(0, x)), Math.min(100, Math.max(0, y)));
+      if (!moved && (Math.abs(moveEvent.clientX - startX) > 6 || Math.abs(moveEvent.clientY - startY) > 6)) {
+        moved = true;
+      }
+      // Sadece dolu yuvalar sürüklenerek taşınır.
+      if (moved && hasPlayer && rect) {
+        const x = ((moveEvent.clientX - rect.left) / rect.width) * 100;
+        const y = 100 - ((moveEvent.clientY - rect.top) / rect.height) * 100;
+        handleSlotDrag(slotIndex, Math.min(100, Math.max(0, x)), Math.min(100, Math.max(0, y)));
+      }
     }
     function onUp() {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      // Kısa dokunuş (sürükleme değil) -> oyuncu seçme penceresini aç.
+      if (!moved) {
+        setActiveSlotIndex(slotIndex);
+        setSlotPickerFilter("");
+      }
     }
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+  }
+
+  function pickerPlayersFor(slotIndex: number) {
+    const currentId = startingSlots[slotIndex]?.playerId ?? null;
+    const q = slotPickerFilter.trim().toLocaleLowerCase("tr");
+    return roster
+      .filter((p) => !assignedPlayerIds.has(p.id) || p.id === currentId)
+      .filter((p) => !onlyAttending || p.id === currentId || isAttending(p.id))
+      .filter((p) => !q || p.name.toLocaleLowerCase("tr").includes(q) || String(p.jersey_number).includes(q));
   }
 
   function handlePitchClick(x: number, y: number) {
@@ -666,9 +691,11 @@ export default function TacticsPage() {
                         style={{ left: `${slot.x}%`, bottom: `${slot.y}%` }}
                       >
                         <div
-                          className={`flex h-8 w-8 items-center justify-center rounded-full border-2 border-white/80 bg-black/40 text-xs font-semibold text-white ${
-                            player && canEdit ? "cursor-grab active:cursor-grabbing" : ""
-                          }`}
+                          className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-semibold text-white ${
+                            activeSlotIndex === i
+                              ? "border-accent ring-2 ring-accent bg-accent/70"
+                              : "border-white/80 bg-black/40"
+                          } ${canEdit ? (player ? "cursor-grab active:cursor-grabbing" : "cursor-pointer") : ""}`}
                         >
                           {player ? player.jersey_number : "+"}
                         </div>
@@ -681,6 +708,64 @@ export default function TacticsPage() {
                     );
                   })}
                 </PitchDiagram>
+
+                {canEdit && activeSlotIndex == null && (
+                  <p className="mt-2 text-xs text-foreground/50">
+                    Sahadaki yuvalara dokunarak oyuncu atayabilir, dolu oyuncuları sürükleyerek
+                    konumlandırabilirsin.
+                  </p>
+                )}
+
+                {canEdit && activeSlotIndex != null && (
+                  <div className={`${card} mt-3 flex flex-col gap-2`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="text-sm font-semibold">
+                        {(FORMATIONS[formation] ?? [])[activeSlotIndex]?.label ?? `Slot ${activeSlotIndex + 1}`} —
+                        oyuncu seç
+                      </h3>
+                      <button
+                        onClick={() => setActiveSlotIndex(null)}
+                        className="text-sm text-foreground/60 hover:text-foreground"
+                      >
+                        Kapat
+                      </button>
+                    </div>
+                    <input
+                      value={slotPickerFilter}
+                      onChange={(e) => setSlotPickerFilter(e.target.value)}
+                      placeholder="Ara — isim veya forma no"
+                      className={`${input} text-sm`}
+                    />
+                    <div className="flex flex-wrap gap-2 max-h-44 overflow-y-auto">
+                      {pickerPlayersFor(activeSlotIndex).map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => {
+                            handleAssignSlot(activeSlotIndex, p.id);
+                            setActiveSlotIndex(null);
+                          }}
+                          className={chip(startingSlots[activeSlotIndex]?.playerId === p.id)}
+                        >
+                          #{p.jersey_number} {p.name}
+                        </button>
+                      ))}
+                      {pickerPlayersFor(activeSlotIndex).length === 0 && (
+                        <p className="text-foreground/60 text-sm">Uygun oyuncu bulunamadı.</p>
+                      )}
+                    </div>
+                    {startingSlots[activeSlotIndex]?.playerId != null && (
+                      <button
+                        onClick={() => {
+                          handleAssignSlot(activeSlotIndex, null);
+                          setActiveSlotIndex(null);
+                        }}
+                        className={`self-start ${dangerLink}`}
+                      >
+                        Bu yuvayı boşalt
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ) : (
